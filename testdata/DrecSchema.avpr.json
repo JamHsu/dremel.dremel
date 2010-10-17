@@ -1,0 +1,9 @@
+{"type": "array", "items": {"name": "Column", "type":"record", "fields" : [
+    {"name":"Name", "type": {"type": "array", "items": {"name": "Name", "type": "record", "fields" : [
+        {"name": "SubName", "type": "string"},
+        {"name": "IsArray", "type": "int"}]}}},
+    {"name":"ValType", "type": "string"},
+    {"name":"ValInt", "type": {"type": "array", "items": {"name": "ValsInt", "type": "int"}}},
+    {"name":"ValString", "type": {"type": "array", "items": {"name": "ValsString", "type": "string"}}},
+    {"name":"Rep", "type": {"type": "array", "items": {"name": "Rep", "type": "int"}}},
+    {"name":"Def", "type": {"type": "array", "items": {"name": "Def", "type": "int"}}}]}}

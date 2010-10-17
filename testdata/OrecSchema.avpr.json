@@ -1,0 +1,10 @@
+{"type": "array", "items": {"name": "Document", "type": "record", "fields" : [ 
+     {"name": "DocId", "type": "int"},
+     {"name":"Links", "type": {"type": "array", "items": {"name": "Links", "type":"record", "fields" : [
+           {"name":"Backward", "type": {"type": "array", "items": {"name": "Backward", "type": "int"}}},
+           {"name":"Forward", "type": {"type": "array", "items": {"name": "Forward", "type": "int"}}}]}}},
+     {"name":"Name", "type": {"type": "array", "items": {"name": "Name", "type": "record", "fields" : [
+           {"name":"Language", "type": {"type": "array", "items": {"name": "Language", "type": "record", "fields" : [
+                  {"name": "Code", "type": "string"},
+                  {"name":"Country", "type": {"type": "array", "items": {"name": "Country", "type": "string"}}}]}}},
+           {"name":"Url", "type": {"type": "array", "items": {"name": "Url", "type": "string"}}}]}}}]}}

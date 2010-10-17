@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="src" path="lib"/>
+	<classpathentry kind="src" path="test"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/4"/>
+	<classpathentry kind="con" path="org.eclipse.ajdt.core.ASPECTJRT_CONTAINER"/>
+	<classpathentry kind="lib" path="lib/antlr-runtime-3.2.jar"/>
+	<classpathentry kind="lib" path="lib/avro-1.3.3.jar"/>
+	<classpathentry kind="lib" path="lib/commons-compiler.jar"/>
+	<classpathentry kind="lib" path="lib/commons-io-1.4.jar"/>
+	<classpathentry kind="lib" path="lib/commons-lang-2.5.jar"/>
+	<classpathentry kind="lib" path="lib/commons-logging-1.1.1.jar"/>
+	<classpathentry kind="lib" path="lib/jackson-core-asl-1.4.5.jar"/>
+	<classpathentry kind="lib" path="lib/jackson-mapper-asl-1.4.5.jar"/>
+	<classpathentry kind="lib" path="lib/janino.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>
