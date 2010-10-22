@@ -51,7 +51,9 @@ public final class Drec {
 		}
 		
 		Expression(AstNode expr, ScannerFacade scanner) {
-			
+			//NEXTTODO
+			//Query parse and resolve parameters by finding respective columnScanner in 
+			// scannerFacade and making a reference to it directly.
 		}
 	}
 	static final class Table {
@@ -66,7 +68,11 @@ public final class Drec {
 	    Set<Query> queries = new LinkedHashSet<Query>();
 	    Map<String, Expression<Object>> expressions = new LinkedHashMap<String, Expression<Object>>();
 	    Expression<Boolean> filter;
-	    StringBuffer alias;
+	    
+	    //temporary variables used only for intermediate results during single method call
+	    transient StringBuffer alias = new StringBuffer();
+	    transient boolean isWithinRecord;
+	    transient StringBuffer within = new StringBuffer();
 	    
 	    void error(String mes, AstNode node) {
 	    	throw new RuntimeException(mes + "  in line: "+node.getLine()+" at position "+node.getCharPositionInLine());
@@ -112,34 +118,44 @@ public final class Drec {
 	    	filter = new Expression<Boolean>((AstNode)node.getChild(0), scanner);
 	    };
 	    void parseCreateColumn(AstNode node) {
+	    	alias.delete(0, alias.length());
+	    	within.delete(0, within.length());
+	    	isWithinRecord = false;
 	    	assert(node.getType() == BqlParser.N_CREATE_COLUMN);
 	    	int count = node.getChildCount();
 	    	assert((count >= 1) && (count <= 3));
-	    	if(count >= 2 && (node.getChild(1).getType() == BqlParser.N_ALIAS)) {
+	    	if(count == 3) {
 	    		parseColumnAlias((AstNode)node.getChild(1));
 	    		parseWithinClause((AstNode)node.getChild(2));
-	    	} else {
-	    		parseWithinClause((AstNode)node.getChild(1));
-	    		parseColumnAlias((AstNode)node.getChild(2));
+	    	} else if(count == 2) {
+	    		if(node.getChild(1).getType() == BqlParser.N_ALIAS)
+	    			parseColumnAlias((AstNode)node.getChild(1));
+	    		else if(node.getChild(1).getType() == BqlParser.N_WITHIN)
+	    			parseWithinClause((AstNode)node.getChild(1));
+	    		else if(node.getChild(1).getType() == BqlParser.N_WITHIN_RECORD)
+	    			parseWithinRecordClause((AstNode)node.getChild(1));
+	    		else assert(true);
 	    	}
     		expressions.put(alias.toString(), new Expression<Object>((AstNode)node.getChild(0), scanner));
 	    };
-	    
-	    
-	    
-	    private void parseExpression(AstNode child) {
-			// TODO Auto-generated method stub
-			
+
+	    private void parseWithinRecordClause(AstNode node) {
+	    	assert(node.getType() == BqlParser.N_WITHIN_RECORD);
+	    	isWithinRecord = true;
 		}
 
-		private void parseWithinClause(AstNode child) {
-			// TODO Auto-generated method stub
-			
+		private void parseWithinClause(AstNode node) {
+	    	assert(node.getType() == BqlParser.N_WITHIN);
+	    	int count = node.getChildCount();
+	    	assert((count == 1));
+	    	within.append(node.getChild(0).getText());
 		}
 
-		private void parseColumnAlias(AstNode child) {
-			// TODO Auto-generated method stub
-			
+		private void parseColumnAlias(AstNode node) {
+	    	assert(node.getType() == BqlParser.N_ALIAS);
+	    	int count = node.getChildCount();
+	    	assert((count == 1));
+	    	alias.append(node.getChild(0).getText());
 		}
 
 		Query(ScannerFacade scanner, AstNode root) {
@@ -157,7 +173,7 @@ public final class Drec {
 	        outSchema = inferOutSchema();
 	    }
 		private Schema inferOutSchema() {
-			// TODO Auto-generated method stub
+			// NEXTTODO infer output schema
 			return null;
 		}
 	}
@@ -421,7 +437,7 @@ public final class Drec {
 
 		public void importFromDrec(Schema orecSourceSchema,
 				File drecSourceFile, FileEncoding drecSourceEncoding,
-				Schema orecDestSchema, FileEncoding drecDestEncoding, Query query)
+				Schema orecDestSchema, FileEncoding drecDestEncoding)
 				throws IOException, InvocationTargetException {
 
 			ScannerFacade scanner = new ScannerFacade(drecSchema,
@@ -444,17 +460,36 @@ public final class Drec {
 				if (ctx.isEmpty && ctx.level == 0)
 					break;
 				
-				if(query != null) {
-					if(query.filter == null || query.filter.evaluate()) {
-						process(query, rtree, wtree, ctx);
-					}
-				}
-				else {
-					copy(rtree, wtree, ctx);
-				}
+				copy(rtree, wtree);
 
 			} while (true);
 
+			writeData(drecData, drecSchema, drecDataFile, drecDestEncoding);
+		}
+		public void importFromQuery(Schema orecSourceSchema,
+				Query query, Schema orecDestSchema, FileEncoding drecDestEncoding)
+				throws IOException, InvocationTargetException {
+			drecData = new GenericData.Array<GenericRecord>(10, drecSchema);
+			Tree wtree = new Tree(0, true);
+			populateIsomorphicWritersTree(query.outSchema, wtree, orecDestSchema
+					.getElementType().getName(), false);
+			ScannerFacade.Tree rtree = query.scanner.rtree;
+
+			//NEXTTODO: this context and advancertree code snippet must be transfered into query
+			//class
+			Context ctx = new Context();
+			do {
+				ctx.level = ctx.nextLevel;
+				ctx.nextLevel = 0;
+				ctx.isEmpty = true;
+				advanceRtree(rtree, ctx);
+
+				if (ctx.isEmpty && ctx.level == 0)
+					break;
+				
+				process(wtree); //evaluates the query and adds one record to final result set 
+
+			} while (true);
 			writeData(drecData, drecSchema, drecDataFile, drecDestEncoding);
 		}
 
@@ -479,8 +514,11 @@ public final class Drec {
 			}
 		}
 
-		private void process(Query query, ScannerFacade.Tree rtree, Tree wtree, Context ctx) throws InvocationTargetException {
-			
+		
+		//NEXTTODO this function is never tested, the copy function is tested very well and should
+		//be consulted to understand how this function must work. In future copy function
+		//must be deleted because copy function is just particular simple case of process function
+		private boolean process(Tree wtree) throws InvocationTargetException {
 			for (Map.Entry<String, ColumnWriter> ws : wtree.scalars.entrySet()) {
 				Expression<Object> expr = ws.getValue().expression;
 				if (expr.param.isChanged) {
@@ -492,12 +530,12 @@ public final class Drec {
 				}
 			}
 			for (Map.Entry<String, Tree> wt : wtree.children.entrySet()) {
-				ScannerFacade.Tree rt = rtree.children.get(wt.getKey());
-				process(query, rt, wt.getValue(), ctx);
+				process(wt.getValue());
 			}
+			return false;
 		}
 
-		private void copy(ScannerFacade.Tree rtree, Tree wtree, Context ctx) {
+		private void copy(ScannerFacade.Tree rtree, Tree wtree) {
 			for (Map.Entry<String, ColumnWriter> ws : wtree.scalars.entrySet()) {
 				ColumnScanner s = rtree.scalars.get(ws.getKey());
 				if (s.isChanged) {
@@ -510,7 +548,7 @@ public final class Drec {
 			}
 			for (Map.Entry<String, Tree> wt : wtree.children.entrySet()) {
 				ScannerFacade.Tree rt = rtree.children.get(wt.getKey());
-				copy(rt, wt.getValue(), ctx);
+				copy(rt, wt.getValue());
 			}
 		}
 

@@ -79,7 +79,7 @@ public class JaninoTest {
         //now in steady state, make time measurements hoping the machine is
         //not overloaded, must be under one second.
         final long startTimeNano = System.nanoTime();
-        for (int i = 0; i < 500; i++) {
+        for (int i = 0; i < 250; i++) {
             scriptCompileAndRun(i, i + 1);
         }
         final long durationNano = System.nanoTime() - startTimeNano;

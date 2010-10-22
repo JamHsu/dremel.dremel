@@ -48,6 +48,7 @@ import org.junit.Test;
 import dremel.common.Drec.FileEncoding;
 import dremel.common.Drec.ScannerFacade;
 import dremel.common.Drec.WriterFacade;
+import dremel.common.Drec.Query;
 
 /**
  * 
@@ -218,14 +219,16 @@ public class AvroTest {
 		writer1.importFromOrec(orecSchema, originalFile, encoding, encoding);
 		writer1 = null;
 		WriterFacade writer2 = new WriterFacade(drecSchema, tempDrecFile2);
-		ScannerFacade scanner = new ScannerFacade(drecSchema, orecSchema,
-				tempDrecFile2, encoding);
-		writer2.importFromDrec(orecSchema, tempDrecFile1, encoding, orecSchema,
-				encoding, new Drec.Query(scanner, "select * from table"));
+		ScannerFacade scanner1 = new ScannerFacade(drecSchema, orecSchema,
+				tempDrecFile1, encoding);
+		writer2.importFromQuery(orecSchema, new Query(scanner1, "select * from table"), 
+				orecSchema, encoding);
 		writer2 = null;
-		scanner.exportToOrec(orecSchema, resultFile, encoding);
-		scanner = null;
-//		assertTrue(deepCompareRecursive(drecSchema, data1, data2));
+		ScannerFacade scanner2 = new ScannerFacade(drecSchema, orecSchema,
+				tempDrecFile2, encoding);
+		scanner2.exportToOrec(orecSchema, resultFile, encoding);
+		scanner2 = null;
+		assertTrue(deepCompareRecursive(drecSchema, originalFile, resultFile));
 	}
 
 	@Test
@@ -258,7 +261,7 @@ public class AvroTest {
 		writer1 = null;
 		WriterFacade writer2 = new WriterFacade(drecSchema, tempDrecFile2);
 		writer2.importFromDrec(orecSchema, tempDrecFile1, encoding, orecSchema,
-				encoding, null);
+				encoding);
 		writer2 = null;
 		Array<GenericRecord> data1 = getData(drecSchema, tempDrecFile1,
 				encoding);
@@ -302,7 +305,7 @@ public class AvroTest {
 		Schema drecSchema = getSchema("DrecSchema.avpr.json");
 		File orecRandomFile = getTempFile("OrecRandomData.avro.json");
 		FileUtils.deleteQuietly(orecRandomFile);
-		generateRandomData(orecSchema, orecRandomFile, 10, encoding);
+		generateRandomData(orecSchema, orecRandomFile, 9, encoding);
 		File tempDrecFile1 = getTempFile("AvroTestDrec1.avro.json");
 		File tempDrecFile2 = getTempFile("AvroTestDrec2.avro.json");
 		FileUtils.deleteQuietly(tempDrecFile1);
@@ -312,7 +315,7 @@ public class AvroTest {
 		writer1 = null;
 		WriterFacade writer2 = new WriterFacade(drecSchema, tempDrecFile2);
 		writer2.importFromDrec(orecSchema, tempDrecFile1, encoding, orecSchema,
-				encoding, null);
+				encoding);
 		writer2 = null;
 		Array<GenericRecord> data1 = getData(drecSchema, tempDrecFile1,
 				encoding);
