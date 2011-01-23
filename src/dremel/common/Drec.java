@@ -11,7 +11,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.antlr.runtime.RecognitionException;
@@ -32,7 +31,10 @@ import org.apache.avro.io.JsonDecoder;
 import org.apache.avro.io.JsonEncoder;
 import org.apache.avro.util.Utf8;
 
+import dremel.common.Drec.AbstractFacade;
+import dremel.common.Drec.ScannerFacade;
 import dremel.common.Drec.ScannerFacade.ColumnScanner;
+
 
 
 public final class Drec {
@@ -214,321 +216,6 @@ public final class Drec {
 
 	}
 
-	public static class WriterFacade extends AbstractFacade {
-
-		// TODO override toString() to ease debugging
-		public final class ColumnWriter extends Column {
-			
-		    // not integrated for now. 
-			Expression<Object> expression;
-			/**
-			 * 
-			 * @param drecColumnSchema - defines column structure. Column might be scalar or array or record.
-			 * @param type - textual representation of the column data type
-			 */
-			ColumnWriter(Schema drecColumnSchema, String type) {
-				super(drecColumnSchema);
-
-				name = new ArrayList<SubName>();
-				name.addAll(currentNamePath);
-				Schema drecNameSchema = drecColumnSchema.getField("Name")
-						.schema().getElementType();
-				nameArray = new GenericData.Array<GenericRecord>(10,
-						drecColumnSchema.getField("Name").schema());
-					
-				maxDefenitionLevel = getDefinitionLevelFromColumnName(nameArray);
-				
-				StringBuffer buf = new StringBuffer();
-				for (SubName subName : name) {
-					GenericRecord rec = new GenericData.Record(drecNameSchema);
-					rec.put("SubName", new Utf8(subName.name));
-					rec.put("IsArray", new Integer(subName.isArray ? 1 : 0));
-					nameArray.add(rec);
-					if (buf.length() != 0)
-						buf.append('.');
-					buf.append(subName.name);
-					if (subName.isArray) {
-						buf.append("[]");
-					}
-				}
-				nameString = buf.toString();
-
-				drecColumn = new GenericData.Record(drecColumnSchema);
-				drecColumn.put("Name", nameArray);
-				drecColumn.put("ValType", new Utf8(type));
-
-				valInt = new GenericData.Array<Integer>(10, drecColumnSchema
-						.getField("ValInt").schema());
-				drecColumn.put("ValInt", valInt);
-
-				valString = new GenericData.Array<Utf8>(10, drecColumnSchema
-						.getField("ValString").schema());
-				drecColumn.put("ValString", valString);
-
-				rep = new GenericData.Array<Integer>(10, drecColumnSchema
-						.getField("Rep").schema());
-				drecColumn.put("Rep", rep);
-
-				def = new GenericData.Array<Integer>(10, drecColumnSchema
-						.getField("Def").schema());
-				drecColumn.put("Def", def);
-				drecData.add(drecColumn);
-				identifyType();
-			}
-		}
-
-		static class Tree extends AbstractFacade.ColumnTree<ColumnWriter, Tree> {
-
-			public Tree(int level, boolean isArray) {
-				super(level, isArray);
-			}
-
-		};
-
-		public WriterFacade(Schema drecSchema, Array<GenericRecord> drecData) {
-			super(drecSchema, drecData);
-		}
-
-		public WriterFacade(Schema drecSchema, File drecDataFile)
-				throws IOException {
-			super(drecSchema, drecDataFile);
-		}
-
-		public WriterFacade(File drecSchemaFile, File drecDataFile)
-				throws IOException {
-			super(drecSchemaFile, drecDataFile);
-		}
-
-		@SuppressWarnings("unchecked")
-		private void importFromOrecRecursive(String name, Schema orecSchema,
-				Object orecData, Tree wtree, int repLevel, int defLevel) {
-			switch (orecSchema.getType()) {
-			case RECORD:
-				Tree subTree = wtree.children.get(name);
-				for (Schema.Field field : orecSchema.getFields()) {
-					importFromOrecRecursive(
-							field.name(),
-							field.schema(),
-							orecData == null ? null
-									: ((GenericRecord) orecData).get(field
-											.pos()), subTree, repLevel,
-							defLevel);
-				}
-				return;
-			case ARRAY:
-				boolean repeated = false;
-				if (orecData != null) {
-					for (Object elem : ((Array<Object>) orecData)) {
-						importFromOrecRecursive(name,
-								orecSchema.getElementType(), elem, wtree,
-								repeated ? wtree.level : repLevel, wtree.level);
-						repeated = true;
-					}
-				}
-				if (!repeated)
-					importFromOrecRecursive(name, orecSchema.getElementType(),
-							null, wtree, repLevel, defLevel);
-
-				return;
-			case STRING:
-			case INT:
-				ColumnWriter columnWriter = wtree.scalars.get(name);
-
-				columnWriter.rep.add(repLevel);
-				columnWriter.def.add(defLevel);
-				if (orecData != null)
-					columnWriter.val.add(orecData);
-				return;
-			default:
-				throw new UnsupportedOperationException();
-			}
-		}
-
-		public void importFromOrec(Schema orecSchema, File orecFile,
-				FileEncoding orecEncoding, FileEncoding drecEncoding)
-				throws IOException {
-
-			Array<GenericRecord> orecData = getData(orecSchema, orecFile,
-					orecEncoding);
-			drecData = new GenericData.Array<GenericRecord>(10, drecSchema);
-			Tree wtree = new Tree(0, true);
-
-			// traverse orecSchema and create isomorphic tree of array writers
-			populateIsomorphicWritersTree(orecSchema, wtree, orecSchema
-					.getElementType().getName(), false);
-
-			// convert the data
-			importFromOrecRecursive(orecSchema.getElementType().getName(),
-					orecSchema, orecData, wtree, 0, 0);
-			writeData(drecData, drecSchema, drecDataFile, drecEncoding);
-		}
-
-		public void importFromDrec(Schema orecSourceSchema,
-				File drecSourceFile, FileEncoding drecSourceEncoding,
-				Schema orecDestSchema, FileEncoding drecDestEncoding)
-				throws IOException, InvocationTargetException {
-
-			ScannerFacade scanner = new ScannerFacade(drecSchema,
-					orecSourceSchema, drecSourceFile, drecSourceEncoding);
-			drecData = new GenericData.Array<GenericRecord>(10, drecSchema);
-			Tree wtree = new Tree(0, true);
-
-			populateIsomorphicWritersTree(orecDestSchema, wtree, orecDestSchema
-					.getElementType().getName(), false);
-
-			ScannerFacade.Tree rtree = scanner.rtree;
-
-			Context ctx = new Context();
-			do {
-				ctx.level = ctx.nextLevel;
-				ctx.nextLevel = 0;
-				ctx.isEmpty = true;
-				advanceRtree(rtree, ctx);
-
-				if (ctx.isEmpty && ctx.level == 0)
-					break;
-				
-				/* copy vrec - one layer of the data - current elements from each column) */
-				/* For the non array columns - there is no advance*/
-				
-				copy(rtree, wtree);
-
-			} while (true);
-
-			writeData(drecData, drecSchema, drecDataFile, drecDestEncoding);
-		}
-		/**
-		 * 
-		 * @param orecSourceSchema - logical schema of the input data 
-		 * @param query - execution plan
-		 * @param orecDestSchema - logical schema of the result
-		 * @param drecDestEncoding - encoding of the result
-		 * 
-		 * @throws IOException
-		 * @throws InvocationTargetException
-		 */
-		public void importFromQuery(Schema orecSourceSchema,
-				Query query, Schema orecDestSchema, FileEncoding drecDestEncoding)
-				throws IOException, InvocationTargetException {
-			drecData = new GenericData.Array<GenericRecord>(10, drecSchema);
-			Tree wtree = new Tree(0, true);
-			populateIsomorphicWritersTree(query.outSchema, wtree, orecDestSchema
-					.getElementType().getName(), false);
-			ScannerFacade.Tree rtree = query.scanner.rtree;
-
-			//NEXTTODO: this context and advance rtree (reader tree) code snippet must be transfered into query
-			//class
-			Context ctx = new Context();
-			do {
-				ctx.level = ctx.nextLevel;
-				ctx.nextLevel = 0;
-				ctx.isEmpty = true;
-				advanceRtree(rtree, ctx);
-
-				if (ctx.isEmpty && ctx.level == 0)
-					break;
-				
-				process(wtree); //evaluates the query and adds one record to final result set 
-
-			} while (true);
-			writeData(drecData, drecSchema, drecDataFile, drecDestEncoding);
-		}
-
-		public static final class Context {
-			boolean isEmpty = true;
-			boolean isChanged = false;
-			int level = 0;
-			int nextLevel = 0;
-		};
-
-		private void advanceRtree(ScannerFacade.Tree rtree, Context ctx) {
-
-			for (ScannerFacade.Tree t : rtree.children.values()) {
-				advanceRtree(t, ctx);
-			}
-
-			for (ColumnScanner s : rtree.scalars.values()) {
-				s.next(ctx.level);
-				if((ctx.nextLevel < s.nextRep))
-					ctx.nextLevel =  s.nextRep;
-				ctx.isEmpty = ctx.isEmpty && !s.isChanged;
-			}
-		}
-
-		
-		//NEXTTODO this function is never tested, the copy function is tested very well and should
-		//be consulted to understand how this function must work. In future copy function
-		//must be deleted because copy function is just particular simple case of process function
-		private boolean process(Tree wtree) throws InvocationTargetException {
-			for (Map.Entry<String, ColumnWriter> ws : wtree.scalars.entrySet()) {
-				Expression<Object> expr = ws.getValue().expression;
-				if (expr.param.isChanged) {
-					if (expr.param.curVal != null) {
-						ws.getValue().val.add(expr.evaluate());
-					}
-					ws.getValue().rep.add(expr.param.curRep);
-					ws.getValue().def.add(expr.param.curDef);
-				}
-			}
-			for (Map.Entry<String, Tree> wt : wtree.children.entrySet()) {
-				process(wt.getValue());
-			}
-			return false;
-		}
-
-		private void copy(ScannerFacade.Tree rtree, Tree wtree) {
-			for (Map.Entry<String, ColumnWriter> ws : wtree.scalars.entrySet()) {
-				ColumnScanner s = rtree.scalars.get(ws.getKey());
-				if (s.isChanged) {
-					if (s.curVal != null) {
-						ws.getValue().val.add(s.curVal);
-					}
-					ws.getValue().rep.add(s.curRep);
-					ws.getValue().def.add(s.curDef);
-				}
-			}
-			for (Map.Entry<String, Tree> wt : wtree.children.entrySet()) {
-				ScannerFacade.Tree rt = rtree.children.get(wt.getKey());
-				copy(rt, wt.getValue());
-			}
-		}
-
-		private void populateIsomorphicWritersTree(Schema orecSchema,
-				Tree wtree, String fromName, boolean fromArray) {
-			switch (orecSchema.getType()) {
-			case RECORD:
-				push(fromName, fromArray);
-				Tree subTree = new Tree(currentNestingLevel, fromArray);
-				for (Schema.Field field : orecSchema.getFields()) {
-					populateIsomorphicWritersTree(field.schema(), subTree,
-							field.name(), false);
-				}
-				wtree.children.put(fromName, subTree);
-				pop();
-				return;
-			case ARRAY:
-				if (fromArray)
-					throw new UnsupportedOperationException(
-							"Arrays of arrays are not supported");
-				populateIsomorphicWritersTree(orecSchema.getElementType(),
-						wtree, fromName, true);
-				return;
-			case STRING:
-			case INT:
-				ColumnWriter w;
-				push(fromName, fromArray);
-				w = new ColumnWriter(drecSchema.getElementType(), orecSchema
-						.getType().toString());
-				pop();
-				wtree.scalars.put(fromName, w);
-				return;
-			default:
-				throw new UnsupportedOperationException();
-			}
-		}
-
-	}
-
 	/**
 	 * Incapsulates Dremel encoding defined in the paper. Contain the
 	 * input data in form of the tree of column scanners.
@@ -570,14 +257,14 @@ public final class Drec {
 			private Iterator<Integer> repIterator;
 			private Iterator<Object> valIterator;
 
-			private Integer curDef;
-			private Integer curRep;
-			private Object curVal;
+			Integer curDef;
+			Integer curRep;
+			Object curVal;
 			private Integer nextDef;
-			private Integer nextRep;
+			Integer nextRep;
 			private boolean nextRepDefExists;
 			private Object nextVal;
-			private boolean isChanged;
+			boolean isChanged;
 
 			/**
 			 * 	
@@ -703,7 +390,7 @@ public final class Drec {
 			};
 		};
 
-		static private class Tree extends
+		static class Tree extends
 				AbstractFacade.ColumnTree<ColumnScanner, Tree> {
 			Tree(int level, boolean isArray) {
 				super(level, isArray);

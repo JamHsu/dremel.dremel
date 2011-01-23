@@ -26,7 +26,7 @@ import java.io.PrintStream;
  */
 aspect AvroTestTraceAspect extends AbstractTrace {
 
-    pointcut classes();//: within(AvroTest); // || within(AvroTest.WriterFacade) || within(AvroTest.ScannerFacade);
+    pointcut classes();//: within(AvroTest); // || within(AvroTest.WriterFacadeImpl) || within(AvroTest.ScannerFacade);
 
 	pointcut constructors();//: execution(* *(..));
 

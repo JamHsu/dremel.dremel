@@ -19,26 +19,21 @@ import dremel.common.Drec.Table;
  *
  */
 public final class Query {
-	final ScannerFacade scanner;
-    final Schema outSchema;
-    final String queryString;
-    final AstNode queryTreeRootNode;
+	ScannerFacade scanner = null;
+    Schema outSchema = null;
+    AstNode queryTreeRootNode = null;
+    
     Set<Table> tables = new LinkedHashSet<Table>();
-    Set<Query> queries = new LinkedHashSet<Query>();
+    Set<Query> subqueries = new LinkedHashSet<Query>();
     Map<String, Expression<Object>> expressions = new LinkedHashMap<String, Expression<Object>>();
     Expression<Boolean> filter;
-    
-    //temporary variables used only for intermediate results during single method call
-    transient StringBuffer alias = new StringBuffer();
-    transient boolean isWithinRecord;	
-    transient StringBuffer within = new StringBuffer();
-    
+       
     void error(String mes, AstNode node) {
     	throw new RuntimeException(mes + "  in line: "+node.getLine()+" at position "+node.getCharPositionInLine());
     }
     
     void parseSelectStatement(AstNode node) {
-    	System.out.println(node.toStringTree());
+    	//System.out.println(node.toStringTree());
     	
     	assert(node.getType() == BqlParser.N_SELECT_STATEMENT);
     	int count = node.getChildCount();
@@ -56,7 +51,7 @@ public final class Query {
     		if(node2.getType() == BqlParser.N_TABLE_NAME) {
     			tables.add(new Table(node2.getText()));
     		} else if (node2.getType() == BqlParser.N_SELECT_STATEMENT){ // Subqueries support 
-    			queries.add(new Query(scanner, node2));
+    			subqueries.add(new Query(scanner, node2));
     		} else assert(false);
     	}
     };
@@ -79,40 +74,41 @@ public final class Query {
     	filter = new Expression<Boolean>((AstNode)node.getChild(0), scanner);
     };
     void parseCreateColumn(AstNode node) {
-    	alias.delete(0, alias.length());
-    	within.delete(0, within.length());
-    	isWithinRecord = false;
+    	StringBuffer alias = new StringBuffer();
+    	
+    	StringBuffer within = new StringBuffer();
+    	boolean isWithinRecord = false;
     	assert(node.getType() == BqlParser.N_CREATE_COLUMN);
     	int count = node.getChildCount();
     	assert((count >= 1) && (count <= 3));
     	if(count == 3) {
-    		parseColumnAlias((AstNode)node.getChild(1));
-    		parseWithinClause((AstNode)node.getChild(2));
+    		parseColumnAlias((AstNode)node.getChild(1), alias);
+    		parseWithinClause((AstNode)node.getChild(2), within);
     	} else if(count == 2) {
     		if(node.getChild(1).getType() == BqlParser.N_ALIAS)
-    			parseColumnAlias((AstNode)node.getChild(1));
+    			parseColumnAlias((AstNode)node.getChild(1), alias);
     		else if(node.getChild(1).getType() == BqlParser.N_WITHIN)
-    			parseWithinClause((AstNode)node.getChild(1));
+    			parseWithinClause((AstNode)node.getChild(1), within);
     		else if(node.getChild(1).getType() == BqlParser.N_WITHIN_RECORD)
-    			parseWithinRecordClause((AstNode)node.getChild(1));
+    			isWithinRecord = parseWithinRecordClause((AstNode)node.getChild(1));
     		else assert(true);
     	}
 		expressions.put(alias.toString(), new Expression<Object>((AstNode)node.getChild(0), scanner));
     };
 
-    private void parseWithinRecordClause(AstNode node) {
+    private boolean parseWithinRecordClause(AstNode node) {
     	assert(node.getType() == BqlParser.N_WITHIN_RECORD);
-    	isWithinRecord = true;
+    	return true;
 	}
 
-	private void parseWithinClause(AstNode node) {
+	private void parseWithinClause(AstNode node, StringBuffer within) {
     	assert(node.getType() == BqlParser.N_WITHIN);
     	int count = node.getChildCount();
     	assert((count == 1));
     	within.append(node.getChild(0).getText());
 	}
 
-	private void parseColumnAlias(AstNode node) {
+	private void parseColumnAlias(AstNode node, StringBuffer alias) {
     	assert(node.getType() == BqlParser.N_ALIAS);
     	int count = node.getChildCount();
     	assert((count == 1));
@@ -120,29 +116,43 @@ public final class Query {
 	}
 
 	Query(ScannerFacade scanner, AstNode root) {
-		System.out.print(scanner);
-        this.scanner = scanner;
-        this.queryString = "";
-        queryTreeRootNode = root;
-        parseSelectStatement(queryTreeRootNode);
-        outSchema = inferOutSchema();
+	//	System.out.print(scanner);
+        init(scanner, root);
     }
 	/**
 	 * 
 	 * @param scanner - data source, will be used in the linking process.
-	 * @param queryString - actualy query to be implemented.
+	 * @param queryString - actually the query to be implemented.
 	 * @throws RecognitionException
 	 */
     Query(ScannerFacade scanner, String queryString) throws RecognitionException {
-    	System.out.println("Quey is created for the scanner "+ scanner.toString());
-        this.scanner = scanner;
-        this.queryString = queryString;
-        queryTreeRootNode = DremelParser.parseBql(queryString);
+    	//System.out.println("Query is created for the scanner "+ scanner.toString());
+    	AstNode tmpQueryTreeRootNode = DremelParser.parseBql(queryString);
+        init(scanner, tmpQueryTreeRootNode);        
+    }
+    
+    private void init(ScannerFacade scanner, AstNode root)
+    {
+    	this.scanner = scanner;        
+        queryTreeRootNode = root;
         parseSelectStatement(queryTreeRootNode);
         outSchema = inferOutSchema();
     }
+    
 	private Schema inferOutSchema() {
 		// NEXTTODO infer output schema
 		return null;
 	}
+	
+	/**
+	 * Executes this query, and write results into the given WriteFacade.
+	 * @param writeFacade
+	 */
+	public void executeQuery(WriterFacadeImpl writeFacade)
+	{
+		// calculate mapping between expressions and writeFacade columns.
+		// perform the binding???
+		// iterate over input data until the end.
+	} 
+	
 }
