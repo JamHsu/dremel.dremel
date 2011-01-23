@@ -47,8 +47,6 @@ import org.junit.Test;
 
 import dremel.common.Drec.FileEncoding;
 import dremel.common.Drec.ScannerFacade;
-import dremel.common.Drec.WriterFacade;
-import dremel.common.Drec.Query;
 
 /**
  * 
@@ -208,20 +206,33 @@ public class AvroTest {
 		// AvroTestTraceAspect.activate(System.err);
 		FileEncoding encoding = FileEncoding.JSON;
 		Schema orecSchema = getSchema("OrecSchema.avpr.json");
-		Schema drecSchema = getSchema("DrecSchema.avpr.json");
+		Schema drecSchema = getSchema("DrecSchema.avpr.json"); // it is common schema for all cases
 		File originalFile = getFile("OrecDremelPaperData.avro.json");
 		File tempDrecFile1 = getTempFile("AvroTestStarQuerySource.avro.json");
 		File tempDrecFile2 = getTempFile("AvroTestStarQueryDest.avro.json");
 		File resultFile = getTempFile("AvroTestStarQueryResult.avro.json");
 		FileUtils.deleteQuietly(tempDrecFile1);
 		FileUtils.deleteQuietly(tempDrecFile2);
-		WriterFacade writer1 = new WriterFacade(drecSchema, tempDrecFile1);
+		
+		// create empty columnar table
+		Drec.WriterFacade writer1 = new Drec.WriterFacade(drecSchema, tempDrecFile1);
+		
+		// read record oriented data into columnar
 		writer1.importFromOrec(orecSchema, originalFile, encoding, encoding);
 		writer1 = null;
-		WriterFacade writer2 = new WriterFacade(drecSchema, tempDrecFile2);
+		
+		// create empty columnar table
+		Drec.WriterFacade writer2 = new Drec.WriterFacade(drecSchema, tempDrecFile2);
+				
+		/**
+		 * Each columnar data file contains two schemas: Fixed dremel schema and
+		 * object schema which defines actual object records  
+		 */
 		ScannerFacade scanner1 = new ScannerFacade(drecSchema, orecSchema,
-				tempDrecFile1, encoding);
-		writer2.importFromQuery(orecSchema, new Query(scanner1, "select * from table"), 
+				/*input*/ tempDrecFile1, encoding);
+		System.out.println("Scanner is "+ scanner1.toString());
+		
+		writer2.importFromQuery(orecSchema, new Query(scanner1, "select Url from table"), 
 				orecSchema, encoding);
 		writer2 = null;
 		ScannerFacade scanner2 = new ScannerFacade(drecSchema, orecSchema,
@@ -256,10 +267,10 @@ public class AvroTest {
 		File tempDrecFile2 = getTempFile("AvroTestDrec2.avro.json");
 		FileUtils.deleteQuietly(tempDrecFile1);
 		FileUtils.deleteQuietly(tempDrecFile2);
-		WriterFacade writer1 = new WriterFacade(drecSchema, tempDrecFile1);
+		Drec.WriterFacade writer1 = new Drec.WriterFacade(drecSchema, tempDrecFile1);
 		writer1.importFromOrec(orecSchema, originalFile, encoding, encoding);
 		writer1 = null;
-		WriterFacade writer2 = new WriterFacade(drecSchema, tempDrecFile2);
+		Drec.WriterFacade writer2 = new Drec.WriterFacade(drecSchema, tempDrecFile2);
 		writer2.importFromDrec(orecSchema, tempDrecFile1, encoding, orecSchema,
 				encoding);
 		writer2 = null;
@@ -310,10 +321,10 @@ public class AvroTest {
 		File tempDrecFile2 = getTempFile("AvroTestDrec2.avro.json");
 		FileUtils.deleteQuietly(tempDrecFile1);
 		FileUtils.deleteQuietly(tempDrecFile2);
-		WriterFacade writer1 = new WriterFacade(drecSchema, tempDrecFile1);
+		Drec.WriterFacade writer1 = new Drec.WriterFacade(drecSchema, tempDrecFile1);
 		writer1.importFromOrec(orecSchema, orecRandomFile, encoding, encoding);
 		writer1 = null;
-		WriterFacade writer2 = new WriterFacade(drecSchema, tempDrecFile2);
+		Drec.WriterFacade writer2 = new Drec.WriterFacade(drecSchema, tempDrecFile2);
 		writer2.importFromDrec(orecSchema, tempDrecFile1, encoding, orecSchema,
 				encoding);
 		writer2 = null;

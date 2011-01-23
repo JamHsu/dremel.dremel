@@ -45,6 +45,8 @@ public class JaninoTest {
         assertEquals(a + b, o.a);
     }
 
+    // TODO - to implement arbitrary expressions with arbitrary return types. For now it 
+    // is hardcord + operator with int result (JaninoTestReturnObject)
     protected IScriptEvaluator compile(int b)
             throws CompileException, Exception {
         IScriptEvaluator se =

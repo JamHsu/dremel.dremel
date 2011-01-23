@@ -51,132 +51,16 @@ public final class Drec {
 		}
 		
 		Expression(AstNode expr, ScannerFacade scanner) {
+			System.out.println("Expression "+ expr.toStringTree());
 			//NEXTTODO
-			//Query parse and resolve parameters by finding respective columnScanner in 
+			// Query parse and resolve parameters by finding respective columnScanner in 
 			// scannerFacade and making a reference to it directly.
 		}
 	}
 	static final class Table {
 		Table(String table) {};
 	}
-	static final class Query {
-		final ScannerFacade scanner;
-	    final Schema outSchema;
-	    final String queryString;
-	    final AstNode queryTreeRootNode;
-	    Set<Table> tables = new LinkedHashSet<Table>();
-	    Set<Query> queries = new LinkedHashSet<Query>();
-	    Map<String, Expression<Object>> expressions = new LinkedHashMap<String, Expression<Object>>();
-	    Expression<Boolean> filter;
-	    
-	    //temporary variables used only for intermediate results during single method call
-	    transient StringBuffer alias = new StringBuffer();
-	    transient boolean isWithinRecord;
-	    transient StringBuffer within = new StringBuffer();
-	    
-	    void error(String mes, AstNode node) {
-	    	throw new RuntimeException(mes + "  in line: "+node.getLine()+" at position "+node.getCharPositionInLine());
-	    }
-	    
-	    void parseSelectStatement(AstNode node) {
-	    	assert(node.getType() == BqlParser.N_SELECT_STATEMENT);
-	    	int count = node.getChildCount();
-	    	assert((count >= 2) && (count <= 3));
-	    	parseFromClause((AstNode)node.getChild(0));
-	    	parseSelectClause((AstNode)node.getChild(1));
-    		parseWhereClause((AstNode)node.getChild(2));
-	    };
-	    void parseFromClause(AstNode node) {
-	    	assert(node.getType() == BqlParser.N_FROM);
-	    	int count = node.getChildCount();
-	    	assert(count > 0);
-	    	for(int i = 0; i < count; i++) {
-	    		AstNode node2 = (AstNode)node.getChild(i);
-	    		if(node2.getType() == BqlParser.N_TABLE_NAME) {
-	    			tables.add(new Table(node2.getText()));
-	    		} else if (node2.getType() == BqlParser.N_SELECT_STATEMENT){
-	    			queries.add(new Query(scanner, node2));
-	    		} else assert(true);
-	    	}
-	    };
-	    void parseSelectClause(AstNode node) {
-	    	assert(node.getType() == BqlParser.N_SELECT);
-	    	int count = node.getChildCount();
-	    	assert(count > 0);
-	    	for(int i = 0; i < count; i++) {
-	    		parseCreateColumn((AstNode)node.getChild(i));
-	    	}
-	    };
-	    void parseWhereClause(AstNode node) {
-	    	if(node == null) {
-	    		filter = null;
-	    		return;
-	    	}
-	    	assert(node.getType() == BqlParser.N_WHERE);
-	    	int count = node.getChildCount();
-	    	assert(count == 1);
-	    	filter = new Expression<Boolean>((AstNode)node.getChild(0), scanner);
-	    };
-	    void parseCreateColumn(AstNode node) {
-	    	alias.delete(0, alias.length());
-	    	within.delete(0, within.length());
-	    	isWithinRecord = false;
-	    	assert(node.getType() == BqlParser.N_CREATE_COLUMN);
-	    	int count = node.getChildCount();
-	    	assert((count >= 1) && (count <= 3));
-	    	if(count == 3) {
-	    		parseColumnAlias((AstNode)node.getChild(1));
-	    		parseWithinClause((AstNode)node.getChild(2));
-	    	} else if(count == 2) {
-	    		if(node.getChild(1).getType() == BqlParser.N_ALIAS)
-	    			parseColumnAlias((AstNode)node.getChild(1));
-	    		else if(node.getChild(1).getType() == BqlParser.N_WITHIN)
-	    			parseWithinClause((AstNode)node.getChild(1));
-	    		else if(node.getChild(1).getType() == BqlParser.N_WITHIN_RECORD)
-	    			parseWithinRecordClause((AstNode)node.getChild(1));
-	    		else assert(true);
-	    	}
-    		expressions.put(alias.toString(), new Expression<Object>((AstNode)node.getChild(0), scanner));
-	    };
 
-	    private void parseWithinRecordClause(AstNode node) {
-	    	assert(node.getType() == BqlParser.N_WITHIN_RECORD);
-	    	isWithinRecord = true;
-		}
-
-		private void parseWithinClause(AstNode node) {
-	    	assert(node.getType() == BqlParser.N_WITHIN);
-	    	int count = node.getChildCount();
-	    	assert((count == 1));
-	    	within.append(node.getChild(0).getText());
-		}
-
-		private void parseColumnAlias(AstNode node) {
-	    	assert(node.getType() == BqlParser.N_ALIAS);
-	    	int count = node.getChildCount();
-	    	assert((count == 1));
-	    	alias.append(node.getChild(0).getText());
-		}
-
-		Query(ScannerFacade scanner, AstNode root) {
-	        this.scanner = scanner;
-	        this.queryString = "";
-	        queryTreeRootNode = root;
-	        parseSelectStatement(queryTreeRootNode);
-	        outSchema = inferOutSchema();
-	    }
-	    Query(ScannerFacade scanner, String queryString) throws RecognitionException {
-	        this.scanner = scanner;
-	        this.queryString = queryString;
-	        queryTreeRootNode = DremelParser.parseBql(queryString);
-	        parseSelectStatement(queryTreeRootNode);
-	        outSchema = inferOutSchema();
-	    }
-		private Schema inferOutSchema() {
-			// NEXTTODO infer output schema
-			return null;
-		}
-	}
 
 	static final class SubName {
 
@@ -196,17 +80,25 @@ public final class Drec {
 
 	static abstract class AbstractFacade {
 		// TODO override toString() to ease debugging
+		/**
+		 * This class correspond to the  field in the Dremel paper example 	
+		 */
 		static abstract class Column {
-			GenericArray<Integer> def;
+			
 			GenericRecord drecColumn;
 			final Schema drecColumnSchema;
 			boolean isArray;
-			int level;
-			List<SubName> name;
-			GenericArray<GenericRecord> nameArray;
+			int maxDefenitionLevel;
+			List<SubName> name; // name of this field and all above fields in reverse order
+			GenericArray<GenericRecord> nameArray; // name of this field and all above fields in reverse order
 			String nameString;
-			GenericArray<Integer> rep;
+			GenericArray<Integer> rep; // repetition "sub column"
+			GenericArray<Integer> def; // definition "sub column"
+			
+			// pointer to the current typed array.
 			GenericArray<Object> val;
+			
+			// only one of the typed  array is actually used
 			GenericArray<Integer> valInt;
 			GenericArray<Utf8> valString;
 			ColumnType valType;
@@ -215,6 +107,36 @@ public final class Drec {
 				this.drecColumnSchema = drecColumnSchema;
 			}
 
+			/**
+			 * Calculate maximum definition level for the given column
+			 * It is calculated as number of "array elements" in the path.  According to the paper
+			 * the definition level is number of undefined values in the path that are actually defined,
+			 * So maximum possible value - it is number of values that are optional or repeated. Both of them
+			 * are represented as arrays. Missing value will be represented as array of size 0. 
+			 * 
+			 * @param namePath - array of field definitions
+			 * @return - max definition level
+			 */
+			protected static int getDefinitionLevelFromColumnName(GenericArray<GenericRecord> namePath)
+			{
+				int resultLevel = -1;
+				for(GenericRecord  nextNamePart : namePath)
+				{
+					Boolean isArray = ((Integer) nextNamePart.get("IsArray")) == 1;
+					if (isArray) {
+						resultLevel++;						
+					}
+				}
+				
+				assert(resultLevel>=0);
+				
+				return resultLevel;
+			}
+			public String toString()
+			{
+				return  null;//"AbstractFacade.Column. name: " + formatName + 
+			}
+			
 			@SuppressWarnings("unchecked")
 			protected void identifyType() {
 				String type = ((Utf8) drecColumn.get("ValType")).toString();
@@ -229,7 +151,7 @@ public final class Drec {
 							+ type);
 			}
 		};
-
+// QUESTION - why the class is abstract ?
 		static abstract class ColumnTree<SCALAR, TREE> {
 			final HashMap<String, TREE> children = new LinkedHashMap<String, TREE>();
 			final int level;
@@ -297,8 +219,13 @@ public final class Drec {
 		// TODO override toString() to ease debugging
 		public final class ColumnWriter extends Column {
 			
+		    // not integrated for now. 
 			Expression<Object> expression;
-
+			/**
+			 * 
+			 * @param drecColumnSchema - defines column structure. Column might be scalar or array or record.
+			 * @param type - textual representation of the column data type
+			 */
 			ColumnWriter(Schema drecColumnSchema, String type) {
 				super(drecColumnSchema);
 
@@ -308,14 +235,15 @@ public final class Drec {
 						.schema().getElementType();
 				nameArray = new GenericData.Array<GenericRecord>(10,
 						drecColumnSchema.getField("Name").schema());
-				level = -1;
+					
+				maxDefenitionLevel = getDefinitionLevelFromColumnName(nameArray);
+				
 				StringBuffer buf = new StringBuffer();
 				for (SubName subName : name) {
 					GenericRecord rec = new GenericData.Record(drecNameSchema);
 					rec.put("SubName", new Utf8(subName.name));
 					rec.put("IsArray", new Integer(subName.isArray ? 1 : 0));
 					nameArray.add(rec);
-					level += subName.isArray ? 1 : 0;
 					if (buf.length() != 0)
 						buf.append('.');
 					buf.append(subName.name);
@@ -460,12 +388,25 @@ public final class Drec {
 				if (ctx.isEmpty && ctx.level == 0)
 					break;
 				
+				/* copy vrec - one layer of the data - current elements from each column) */
+				/* For the non array columns - there is no advance*/
+				
 				copy(rtree, wtree);
 
 			} while (true);
 
 			writeData(drecData, drecSchema, drecDataFile, drecDestEncoding);
 		}
+		/**
+		 * 
+		 * @param orecSourceSchema - logical schema of the input data 
+		 * @param query - execution plan
+		 * @param orecDestSchema - logical schema of the result
+		 * @param drecDestEncoding - encoding of the result
+		 * 
+		 * @throws IOException
+		 * @throws InvocationTargetException
+		 */
 		public void importFromQuery(Schema orecSourceSchema,
 				Query query, Schema orecDestSchema, FileEncoding drecDestEncoding)
 				throws IOException, InvocationTargetException {
@@ -475,7 +416,7 @@ public final class Drec {
 					.getElementType().getName(), false);
 			ScannerFacade.Tree rtree = query.scanner.rtree;
 
-			//NEXTTODO: this context and advancertree code snippet must be transfered into query
+			//NEXTTODO: this context and advance rtree (reader tree) code snippet must be transfered into query
 			//class
 			Context ctx = new Context();
 			do {
@@ -588,11 +529,41 @@ public final class Drec {
 
 	}
 
+	/**
+	 * Incapsulates Dremel encoding defined in the paper. Contain the
+	 * input data in form of the tree of column scanners.
+	 * @author David.Gruzman
+	 *
+	 */
 	public static class ScannerFacade extends AbstractFacade {
 
+		// It is a tree of the ColumnScanner objects. 
 		Tree rtree = new Tree(0, true);
 
-		// TODO override toString() to ease debugging
+
+		// iterate over the tree of columns and print it.
+		public String toString()
+		{
+			StringBuilder result = new StringBuilder();
+			prettyPrintRecursive(rtree, result);
+			
+			return result.toString();				
+		}
+		
+		public void prettyPrintRecursive(Tree subtree, StringBuilder result)
+		{
+			for(String columnName : subtree.scalars.keySet())
+			{
+				result.append("Column in the level " + subtree.level + " is "+columnName + "\n");								
+			}
+			for(String child : subtree.children.keySet())
+			{
+				Tree childTree = subtree.children.get(child);
+				prettyPrintRecursive(childTree, result);
+			}
+			
+		}
+		
 		final static public class ColumnScanner extends Column {
 
 			private Iterator<Integer> defIterator;
@@ -608,6 +579,11 @@ public final class Drec {
 			private Object nextVal;
 			private boolean isChanged;
 
+			/**
+			 * 	
+			 * @param drecColumnSchema 
+			 * @param drecColumn_  Dremel column with string or int value + columns of definitions and repetition levels
+			 */
 			@SuppressWarnings("unchecked")
 			ColumnScanner(Schema drecColumnSchema, GenericRecord drecColumn_) {
 				super(drecColumnSchema);
@@ -630,6 +606,8 @@ public final class Drec {
 				valIterator = val.iterator();
 
 				identifyName();
+				
+				maxDefenitionLevel = getDefinitionLevelFromColumnName(nameArray); 
 
 				// prime rep and def columns
 				preloadNext();
@@ -665,7 +643,7 @@ public final class Drec {
 				}
 
 				// retrieve val if needed
-				if (nextRepDefExists && (nextDef == level)) {
+				if (nextRepDefExists && (nextDef == maxDefenitionLevel)) {
 					// retrieve value, must be there
 					ensureConsistency(valIterator.hasNext());
 					nextVal = valIterator.next();
@@ -702,7 +680,7 @@ public final class Drec {
 
 			void identifyName() {
 				name = new ArrayList<SubName>();
-				level = -1;
+				//level = -1;
 				StringBuffer buf = new StringBuffer();
 				for (GenericRecord subName : nameArray) {
 					if (buf.length() != 0)
@@ -712,14 +690,16 @@ public final class Drec {
 					name.add(new SubName(s, isArray));
 					buf.append(s);
 					if (isArray) {
-						level++;
+					//	level++;
 						buf.append("[]");
 					}
 				}
 				nameString = buf.toString();
-				if (level < 0)
-					throw new RuntimeException(
+				// QUESTION - why level can not be left 01, if there are no arrays
+				/*if (level < 0)  // 
+					throw new RuntimeException( 
 							"Outer enclosing array is missing");
+							*/
 			};
 		};
 
@@ -833,6 +813,14 @@ public final class Drec {
 		}
 	}
 
+	/**
+	 * Read given avro file as array of avro records.
+	 * @param schema - schema of the data
+	 * @param file - file to read from
+	 * @param encoding - encoding to be used (JSON or BIN)
+	 * @return array of all records in the file
+	 * @throws IOException
+	 */
 	public static Array<GenericRecord> getData(Schema schema, File file,
 			FileEncoding encoding) throws IOException {
 		DatumReader<Array<GenericRecord>> reader = new GenericDatumReader<Array<GenericRecord>>(
@@ -851,6 +839,15 @@ public final class Drec {
 		return inData;
 	}
 
+
+	/**
+	 * Saves given data under given schema, with given encoding, using Avro framework
+	 * @param data - array of avro records.
+	 * @param schema - schem to which records conform
+	 * @param file = file to save data
+	 * @param encoding - incoding o be used. it can be JSON or BIN
+	 * @throws IOException
+	 */
 	public static void writeData(Array<GenericRecord> data, Schema schema,
 			File file, FileEncoding encoding) throws IOException {
 		Encoder encoder;
