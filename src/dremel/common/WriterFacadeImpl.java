@@ -45,22 +45,10 @@ public class WriterFacadeImpl extends AbstractFacade implements WriterFacade {
 			nameArray = new GenericData.Array<GenericRecord>(10,
 					drecColumnSchema.getField("Name").schema());
 				
-			maxDefenitionLevel = getDefinitionLevelFromColumnName(nameArray);
+			maxDefenitionLevel = getMaxDefinitionLevelFromColumnName(nameArray);
 			
-			StringBuffer buf = new StringBuffer();
-			for (SubName subName : name) {
-				GenericRecord rec = new GenericData.Record(drecNameSchema);
-				rec.put("SubName", new Utf8(subName.name));
-				rec.put("IsArray", new Integer(subName.isArray ? 1 : 0));
-				nameArray.add(rec);
-				if (buf.length() != 0)
-					buf.append('.');
-				buf.append(subName.name);
-				if (subName.isArray) {
-					buf.append("[]");
-				}
-			}
-			nameString = buf.toString();
+			// initialize field name if form of nameArray and nameString. 
+			initNameStrcutures(drecNameSchema);
 
 			drecColumn = new GenericData.Record(drecColumnSchema);
 			drecColumn.put("Name", nameArray);
@@ -83,6 +71,22 @@ public class WriterFacadeImpl extends AbstractFacade implements WriterFacade {
 			drecColumn.put("Def", def);
 			drecData.add(drecColumn);
 			identifyType();
+		}
+		private void initNameStrcutures(Schema drecNameSchema) {
+			StringBuffer buf = new StringBuffer();
+			for (SubName subName : name) {
+				GenericRecord rec = new GenericData.Record(drecNameSchema);
+				rec.put("SubName", new Utf8(subName.name));
+				rec.put("IsArray", new Integer(subName.isArray ? 1 : 0));
+				nameArray.add(rec);
+				if (buf.length() != 0)
+					buf.append('.');
+				buf.append(subName.name);
+				if (subName.isArray) {
+					buf.append("[]");
+				}
+			}
+			nameString = buf.toString();
 		}
 	}
 
@@ -167,7 +171,7 @@ public class WriterFacadeImpl extends AbstractFacade implements WriterFacade {
 		WriterFacadeImpl.WriterTree wtree = new WriterTree(0, true);
 
 		// traverse orecSchema and create isomorphic tree of array writers
-		populateIsomorphicWritersTree(orecSchema, wtree, orecSchema
+		populateIsomorphicWritersTreeRecursive(orecSchema, wtree, orecSchema
 				.getElementType().getName(), false);
 
 		// convert the data
@@ -190,7 +194,7 @@ public class WriterFacadeImpl extends AbstractFacade implements WriterFacade {
 		drecData = new GenericData.Array<GenericRecord>(10, drecSchema);
 		WriterFacadeImpl.WriterTree wtree = new WriterTree(0, true);
 
-		populateIsomorphicWritersTree(orecDestSchema, wtree, orecDestSchema
+		populateIsomorphicWritersTreeRecursive(orecDestSchema, wtree, orecDestSchema
 				.getElementType().getName(), false);
 
 		ScannerFacade.Tree rtree = scanner.rtree;
@@ -222,9 +226,10 @@ public class WriterFacadeImpl extends AbstractFacade implements WriterFacade {
 			Query query, Schema orecDestSchema, FileEncoding drecDestEncoding)
 			throws IOException, InvocationTargetException {
 		drecData = new GenericData.Array<GenericRecord>(10, drecSchema);
+		
 		WriterFacadeImpl.WriterTree wtree = new WriterTree(0, true);
 		
-		populateIsomorphicWritersTree(query.outSchema, wtree, orecDestSchema
+		populateIsomorphicWritersTreeRecursive(query.outSchema, wtree, orecDestSchema
 				.getElementType().getName(), false);
 		
 		ScannerFacade.Tree rtree = query.scanner.rtree;
@@ -233,7 +238,7 @@ public class WriterFacadeImpl extends AbstractFacade implements WriterFacade {
 		//class
 		WriterFacadeImpl.Context ctx = new Context();
 		do {
-			ctx.level = ctx.nextLevel;
+			ctx.level = ctx.nextLevel; 
 			ctx.nextLevel = 0;
 			ctx.isEmpty = true;
 			advanceRtreeRecursive(rtree, ctx);
@@ -272,7 +277,13 @@ public class WriterFacadeImpl extends AbstractFacade implements WriterFacade {
 	//NEXTTODO this function is never tested, the copy function is tested very well and should
 	//be consulted to understand how this function must work. In future copy function
 	//must be deleted because copy function is just particular simple case of process function
+	
+	/**
+	 * Copy single slice (VRec)
+	 */
 	private static boolean process(WriterFacadeImpl.WriterTree wtree) throws InvocationTargetException {
+		
+		
 		for (Map.Entry<String, ColumnWriter> ws : wtree.scalars.entrySet()) {
 			Expression<Object> expr = ws.getValue().expression;
 			if (expr.param.isChanged) {
@@ -286,6 +297,7 @@ public class WriterFacadeImpl extends AbstractFacade implements WriterFacade {
 		for (Map.Entry<String, WriterFacadeImpl.WriterTree> wt : wtree.children.entrySet()) {
 			process(wt.getValue());
 		}
+		
 		return false;
 	}
 
@@ -306,14 +318,14 @@ public class WriterFacadeImpl extends AbstractFacade implements WriterFacade {
 		}
 	}
 
-	private void populateIsomorphicWritersTree(Schema orecSchema,
+	private void populateIsomorphicWritersTreeRecursive(Schema orecSchema,
 			WriterFacadeImpl.WriterTree wtree, String fromName, boolean fromArray) {
 		switch (orecSchema.getType()) {
 		case RECORD:
 			push(fromName, fromArray);
 			WriterFacadeImpl.WriterTree subTree = new WriterTree(currentNestingLevel, fromArray);
 			for (Schema.Field field : orecSchema.getFields()) {
-				populateIsomorphicWritersTree(field.schema(), subTree,
+				populateIsomorphicWritersTreeRecursive(field.schema(), subTree,
 						field.name(), false);
 			}
 			wtree.children.put(fromName, subTree);
@@ -323,7 +335,7 @@ public class WriterFacadeImpl extends AbstractFacade implements WriterFacade {
 			if (fromArray)
 				throw new UnsupportedOperationException(
 						"Arrays of arrays are not supported");
-			populateIsomorphicWritersTree(orecSchema.getElementType(),
+			populateIsomorphicWritersTreeRecursive(orecSchema.getElementType(),
 					wtree, fromName, true);
 			return;
 		case STRING:

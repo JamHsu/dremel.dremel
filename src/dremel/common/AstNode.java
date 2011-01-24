@@ -32,15 +32,5 @@ public class AstNode  extends CommonTree{
     public String toString()
     {
     	return super.toString();
-    }
-    /*
-    public String prettyPrint()
-    {
-    	StringBuilder result = new StringBuilder();
-    	
-    }
-    private void printTreeRecursive(StringBuilder output, AstNode node)
-    {
-    	List<Ast> node.getChildren();
-    } */ 
+    }   
 }

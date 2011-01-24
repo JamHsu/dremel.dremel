@@ -141,7 +141,8 @@ public final class Query {
     
 	private Schema inferOutSchema() {
 		// NEXTTODO infer output schema
-		return null;
+		// HARDCODED OUTPUT Schema equals to input schema
+		return scanner.getDataSetSchema();
 	}
 	
 	/**

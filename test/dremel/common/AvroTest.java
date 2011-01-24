@@ -200,7 +200,8 @@ public class AvroTest {
 		// FileUtils.forceDelete(orecFile2);
 	}
 
-	@Test
+	// TODO Currently working to make implement this test
+	//@Test
 	public void queryStarDremelPaperDataTest()
 			throws IOException, RecognitionException, InvocationTargetException {
 		// AvroTestTraceAspect.activate(System.err);
@@ -232,7 +233,7 @@ public class AvroTest {
 				/*input*/ tempDrecFile1, encoding);
 		System.out.println("Scanner is "+ scanner1.toString());
 		
-		writer2.importFromQuery(orecSchema, new Query(scanner1, "select * from table"), 
+		writer2.importFromQuery(orecSchema, new Query(scanner1, "select Url from table"), 
 				orecSchema, encoding);
 		writer2 = null;
 		ScannerFacade scanner2 = new ScannerFacade(drecSchema, orecSchema,
@@ -301,6 +302,7 @@ public class AvroTest {
 		drecToDrecRoundtripRandomConvert(getSchema(schemaFile), FileEncoding.JSON);
 	}
 
+	// TODO  this test ocassionaly fails. It happens once.
 	@Test
 	public void drecToDrecConversionRandomSchemaAndDataBinaryTest()
 			throws IOException, InvocationTargetException {
@@ -346,6 +348,12 @@ public class AvroTest {
 			throws IOException {
 		orecToDrecRoundtripRandomDataConvert(FileEncoding.BIN);
 	}
+	
+/*	@Test
+	public void specificQueryTest()
+	{
+			
+	} */
 
 	public void orecToDrecRoundtripRandomDataConvert(FileEncoding encoding)
 			throws IOException {

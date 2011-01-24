@@ -53,10 +53,18 @@ public final class Drec {
 		}
 		
 		Expression(AstNode expr, ScannerFacade scanner) {
-			System.out.println("Expression "+ expr.toStringTree());
+			//System.out.println("Expression "+ expr.toStringTree());
 			//NEXTTODO
 			// Query parse and resolve parameters by finding respective columnScanner in 
 			// scannerFacade and making a reference to it directly.
+			
+			//TODO - make real implementation
+			// Url column
+			//script = new JavaLangScript()
+						
+			//Script is compiled java implementation of the BQL expression 
+			// input parameters is data from relevant columns. Output is scalar.
+			
 		}
 	}
 	static final class Table {
@@ -119,7 +127,7 @@ public final class Drec {
 			 * @param namePath - array of field definitions
 			 * @return - max definition level
 			 */
-			protected static int getDefinitionLevelFromColumnName(GenericArray<GenericRecord> namePath)
+			protected static int getMaxDefinitionLevelFromColumnName(GenericArray<GenericRecord> namePath)
 			{
 				int resultLevel = -1;
 				for(GenericRecord  nextNamePart : namePath)
@@ -226,8 +234,14 @@ public final class Drec {
 
 		// It is a tree of the ColumnScanner objects. 
 		Tree rtree = new Tree(0, true);
+		// Schema of the whole dataset accessed through the ScannerFacade
+		Schema dataSetSchema = null;
 
-
+		public Schema getDataSetSchema()
+		{
+			return dataSetSchema;
+		}
+		
 		// iterate over the tree of columns and print it.
 		public String toString()
 		{
@@ -294,7 +308,7 @@ public final class Drec {
 
 				identifyName();
 				
-				maxDefenitionLevel = getDefinitionLevelFromColumnName(nameArray); 
+				maxDefenitionLevel = getMaxDefinitionLevelFromColumnName(nameArray); 
 
 				// prime rep and def columns
 				preloadNext();
@@ -400,6 +414,7 @@ public final class Drec {
 		ScannerFacade(Schema drecSchema, Schema orecSchema,
 				Array<GenericRecord> drecData) {
 			super(drecSchema, drecData);
+			dataSetSchema = orecSchema;
 			populateIsomorphicReadersTree(orecSchema,
 					drecSchema.getElementType(), drecData.iterator(), rtree,
 					orecSchema.getElementType().getName(), false);
@@ -408,6 +423,7 @@ public final class Drec {
 		ScannerFacade(Schema drecSchema, Schema orecSchema, File drecDataFile,
 				FileEncoding encoding) throws IOException {
 			super(drecSchema, getData(drecSchema, drecDataFile, encoding));
+			dataSetSchema = orecSchema;
 			populateIsomorphicReadersTree(orecSchema,
 					drecSchema.getElementType(), drecData.iterator(), rtree,
 					orecSchema.getElementType().getName(), false);
