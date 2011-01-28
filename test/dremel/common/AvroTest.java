@@ -201,7 +201,7 @@ public class AvroTest {
 	}
 
 	// TODO Currently working to make implement this test
-	//@Test
+	@Test
 	public void queryStarDremelPaperDataTest()
 			throws IOException, RecognitionException, InvocationTargetException {
 		// AvroTestTraceAspect.activate(System.err);
@@ -233,9 +233,12 @@ public class AvroTest {
 				/*input*/ tempDrecFile1, encoding);
 		System.out.println("Scanner is "+ scanner1.toString());
 		
-		writer2.importFromQuery(orecSchema, new Query(scanner1, "select Url from table"), 
+		writer2.importFromQuery(orecSchema, new Query(scanner1, "select Forward from table"), 
 				orecSchema, encoding);
 		writer2 = null;
+	
+		//TODO to implement proper comparison.
+		
 		ScannerFacade scanner2 = new ScannerFacade(drecSchema, orecSchema,
 				tempDrecFile2, encoding);
 		scanner2.exportToOrec(orecSchema, resultFile, encoding);

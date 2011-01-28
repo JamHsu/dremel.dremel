@@ -44,6 +44,10 @@ public class JavaLangScript {
         se.cook(script);
 
     };
+    
+    public JavaLangScript(IScriptEvaluator forScriptEvaluator){
+    	se = forScriptEvaluator;
+	}
     public Object evaluate(Object[] params) throws InvocationTargetException {
         return se.evaluate(params);
     };

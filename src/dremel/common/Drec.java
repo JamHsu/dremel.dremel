@@ -2,9 +2,9 @@ package dremel.common;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -32,7 +32,6 @@ import org.apache.avro.io.JsonEncoder;
 import org.apache.avro.util.Utf8;
 
 import dremel.common.Drec.AbstractFacade;
-import dremel.common.Drec.ScannerFacade;
 import dremel.common.Drec.ScannerFacade.ColumnScanner;
 
 
@@ -42,31 +41,6 @@ public final class Drec {
 		INT, STRING
 	}
 
-	static final class Expression<T> {
-		JavaLangScript script;
-		ColumnScanner params[];
-		ColumnScanner param;
-		
-		@SuppressWarnings("unchecked")
-		public T evaluate() throws InvocationTargetException {
-			return (T) script.evaluate(params);
-		}
-		
-		Expression(AstNode expr, ScannerFacade scanner) {
-			//System.out.println("Expression "+ expr.toStringTree());
-			//NEXTTODO
-			// Query parse and resolve parameters by finding respective columnScanner in 
-			// scannerFacade and making a reference to it directly.
-			
-			//TODO - make real implementation
-			// Url column
-			//script = new JavaLangScript()
-						
-			//Script is compiled java implementation of the BQL expression 
-			// input parameters is data from relevant columns. Output is scalar.
-			
-		}
-	}
 	static final class Table {
 		Table(String table) {};
 	}
@@ -102,10 +76,10 @@ public final class Drec {
 			List<SubName> name; // name of this field and all above fields in reverse order
 			GenericArray<GenericRecord> nameArray; // name of this field and all above fields in reverse order
 			String nameString;
-			GenericArray<Integer> rep; // repetition "sub column"
-			GenericArray<Integer> def; // definition "sub column"
+			GenericArray<Integer> rep; // repetition "sub column", references to the drecColumn
+			GenericArray<Integer> def; // definition "sub column", references to the drecColumn
 			
-			// pointer to the current typed array.
+			// pointer to the current typed array. it is referanced or valInt or valString.
 			GenericArray<Object> val;
 			
 			// only one of the typed  array is actually used
@@ -161,7 +135,7 @@ public final class Drec {
 							+ type);
 			}
 		};
-// QUESTION - why the class is abstract ?
+
 		static abstract class ColumnTree<SCALAR, TREE> {
 			final HashMap<String, TREE> children = new LinkedHashMap<String, TREE>();
 			final int level;
@@ -172,13 +146,53 @@ public final class Drec {
 				this.level = level;
 				this.isArray = isArray;
 			};
+						
+			public Column getColumnByName(String columnName) {
+				// TODO Auto-generated method stub
+				Column res = getColumnByNameRecursive(columnName, this);
+				return res;
+			}
+
+			private Column getColumnByNameRecursive(String columnName,
+					ColumnTree<SCALAR, TREE> subtree) {
+				
+				
+				/*
+				for(String scalarName : subtree.scalars.keySet())
+				{
+					System.out.println("scalar found: "+scalarName);
+				} 
+					
+				System.out.println("");
+				*/
+				
+				if(subtree.scalars.containsKey(columnName))
+				{
+					return (Column)subtree.scalars.get(columnName); 
+				}
+				
+				for(String childSubtreeName : subtree.children.keySet())
+				{
+					Column columnFound = getColumnByNameRecursive(columnName,
+							(ColumnTree<SCALAR, TREE>)subtree.children.get(childSubtreeName));
+					if(columnFound != null)
+					{
+						return columnFound; 
+					}
+				}
+				return null;
+			}
+		
+			
 		}
 
+				
+		
 		@SuppressWarnings("serial")
 		static final class ColumnList<COLUMN> extends ArrayList<COLUMN> {
 		};
 
-		final List<SubName> currentNamePath = new ArrayList<SubName>();
+		final List<SubName> currentNamePath= new ArrayList<SubName>();
 
 		transient int currentNestingLevel;
 
@@ -233,7 +247,7 @@ public final class Drec {
 	public static class ScannerFacade extends AbstractFacade {
 
 		// It is a tree of the ColumnScanner objects. 
-		Tree rtree = new Tree(0, true);
+		ColumnScannersTree rtree = new ColumnScannersTree(0, true);
 		// Schema of the whole dataset accessed through the ScannerFacade
 		Schema dataSetSchema = null;
 
@@ -251,7 +265,7 @@ public final class Drec {
 			return result.toString();				
 		}
 		
-		public void prettyPrintRecursive(Tree subtree, StringBuilder result)
+		public void prettyPrintRecursive(ColumnScannersTree subtree, StringBuilder result)
 		{
 			for(String columnName : subtree.scalars.keySet())
 			{
@@ -259,7 +273,7 @@ public final class Drec {
 			}
 			for(String child : subtree.children.keySet())
 			{
-				Tree childTree = subtree.children.get(child);
+				ColumnScannersTree childTree = subtree.children.get(child);
 				prettyPrintRecursive(childTree, result);
 			}
 			
@@ -273,7 +287,7 @@ public final class Drec {
 
 			Integer curDef;
 			Integer curRep;
-			Object curVal;
+			public Object curVal;
 			private Integer nextDef;
 			Integer nextRep;
 			private boolean nextRepDefExists;
@@ -404,9 +418,9 @@ public final class Drec {
 			};
 		};
 
-		static class Tree extends
-				AbstractFacade.ColumnTree<ColumnScanner, Tree> {
-			Tree(int level, boolean isArray) {
+		static class ColumnScannersTree extends
+				AbstractFacade.ColumnTree<ColumnScanner, ColumnScannersTree> {
+			ColumnScannersTree(int level, boolean isArray) {
 				super(level, isArray);
 			}
 		};
@@ -430,13 +444,13 @@ public final class Drec {
 		}
 
 		@SuppressWarnings("unchecked")
-		private static Object exportToOrecRecursive(String name, Tree rtree,
+		private static Object exportToOrecRecursive(String name, ColumnScannersTree rtree,
 				Schema orecSchema, int rep) {
 			switch (orecSchema.getType()) {
 			case RECORD:
 				boolean isFieldsEmpty = true;
 				GenericRecord record = new GenericData.Record(orecSchema);
-				Tree subTree = rtree.children.get(name);
+				ColumnScannersTree subTree = rtree.children.get(name);
 				for (Schema.Field field : orecSchema.getFields()) {
 					Object o = exportToOrecRecursive(field.name(), subTree,
 							field.schema(), rep);
@@ -480,12 +494,12 @@ public final class Drec {
 
 		private void populateIsomorphicReadersTree(Schema orecSchema,
 				Schema drecColumnSchema,
-				Iterator<GenericRecord> drecDataIterator, Tree rtree,
+				Iterator<GenericRecord> drecDataIterator, ColumnScannersTree rtree,
 				String fromName, boolean fromArray) {
 			switch (orecSchema.getType()) {
 			case RECORD:
 				push(fromName, fromArray);
-				Tree subTree = new Tree(currentNestingLevel, fromArray);
+				ColumnScannersTree subTree = new ColumnScannersTree(currentNestingLevel, fromArray);
 				for (Schema.Field field : orecSchema.getFields()) {
 					populateIsomorphicReadersTree(field.schema(),
 							drecColumnSchema, drecDataIterator, subTree,
@@ -514,6 +528,41 @@ public final class Drec {
 				throw new UnsupportedOperationException();
 			}
 		}
+/*
+		public ColumnScanner getColumnByName(String columnName) {
+			// TODO Auto-generated method stub
+			ColumnScanner res = getColumnByNameRecursive(columnName, rtree);
+			return res;
+		}
+
+						
+		private ColumnScanner getColumnByNameRecursive(String columnName,
+				ColumnScannersTree subtree) {
+			
+			for(String scalarName : subtree.scalars.keySet())
+			{
+				System.out.println("scalar found: "+scalarName);
+			}
+				
+			System.out.println("");
+			
+			if(subtree.scalars.containsKey(columnName))
+			{
+				return subtree.scalars.get(columnName); 
+			}
+			
+			for(String childSubtreeName : subtree.children.keySet())
+			{
+				ColumnScanner scannerFound = getColumnByNameRecursive(columnName,
+						subtree.children.get(childSubtreeName));
+				if(scannerFound != null)
+				{
+					return scannerFound; 
+				}
+			}
+			return null;
+		}
+		*/
 	}
 
 	/**
@@ -581,8 +630,13 @@ public final class Drec {
 		return Schema.parse(new FileInputStream(file));
 	}
 
-	static public Schema getSchema(String filename) throws IOException {
-		return Schema.parse(new FileInputStream(getFile(filename)));
+	static public Schema getSchema(String filename){
+		
+		try {
+			return Schema.parse(new FileInputStream(getFile(filename)));
+		} catch (Exception e) {
+			throw new RuntimeException("Loading schema from the file "+filename+" failed ", e);
+		}
 	}
 
 	static public File getTempFile(String filename) {

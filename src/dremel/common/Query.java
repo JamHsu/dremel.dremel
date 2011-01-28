@@ -8,9 +8,10 @@ import java.util.Set;
 import org.antlr.runtime.RecognitionException;
 import org.apache.avro.Schema;
 
-import dremel.common.Drec.Expression;
 import dremel.common.Drec.ScannerFacade;
 import dremel.common.Drec.Table;
+import dremel.common.WriterFacadeImpl.WriterTree;
+import dremel.playground.AvroExperiments;
 
 
 /**
@@ -23,9 +24,11 @@ public final class Query {
     Schema outSchema = null;
     AstNode queryTreeRootNode = null;
     
+    WriterFacadeImpl.WriterTree wtree = new WriterTree(0, true);
+		   
     Set<Table> tables = new LinkedHashSet<Table>();
     Set<Query> subqueries = new LinkedHashSet<Query>();
-    Map<String, Expression<Object>> expressions = new LinkedHashMap<String, Expression<Object>>();
+    Map<String, Expression<Object>> expressions = new LinkedHashMap<String, Expression<Object>>(); // map from the alias to the expression
     Expression<Boolean> filter;
        
     void error(String mes, AstNode node) {
@@ -91,12 +94,33 @@ public final class Query {
     			parseWithinClause((AstNode)node.getChild(1), within);
     		else if(node.getChild(1).getType() == BqlParser.N_WITHIN_RECORD)
     			isWithinRecord = parseWithinRecordClause((AstNode)node.getChild(1));
-    		else assert(true);
-    	}
-		expressions.put(alias.toString(), new Expression<Object>((AstNode)node.getChild(0), scanner));
+    		else {
+    				assert(false);
+    	  		}
+    	}else {
+			// there is only column name
+			alias.append(extractColumnNameFromSingleColumnExpression(node));
+		}
+    	System.out.println(" alias is "+ alias.toString());
+    	System.out.println(" column AST is "+ node.toStringTree());
+    	    	    	
+		expressions.put(alias.toString(), new Expression<Object>((AstNode)node, scanner));
     };
 
-    private boolean parseWithinRecordClause(AstNode node) {
+    /**
+     * Takes AST of the part of the select which contains only one column. It looks like this:
+     * (N_CREATE_COLUMN (N_EXPRESSION (N_COLUMN (N_COLUMN_NAME Url))))
+     * And return the name of the column. In this case: Url
+     * @param node - AST node to look for the column name
+     * @return column name
+     */
+    public static String extractColumnNameFromSingleColumnExpression(AstNode node) {
+    	
+    	AstNode columnNode = (AstNode) node.getChild(0).getChild(0).getChild(0).getChild(0);    	
+		return columnNode.getText();
+	}
+
+	private boolean parseWithinRecordClause(AstNode node) {
     	assert(node.getType() == BqlParser.N_WITHIN_RECORD);
     	return true;
 	}
@@ -135,24 +159,28 @@ public final class Query {
     {
     	this.scanner = scanner;        
         queryTreeRootNode = root;
-        parseSelectStatement(queryTreeRootNode);
+        
         outSchema = inferOutSchema();
+        parseSelectStatement(queryTreeRootNode);
     }
     
 	private Schema inferOutSchema() {
 		// NEXTTODO infer output schema
 		// HARDCODED OUTPUT Schema equals to input schema
-		return scanner.getDataSetSchema();
+		return AvroExperiments.createUrlOnlySchema();
 	}
 	
 	/**
 	 * Executes this query, and write results into the given WriteFacade.
 	 * @param writeFacade
 	 */
-	public void executeQuery(WriterFacadeImpl writeFacade)
+	public void executeQuery(WriterFacade writeFacade)
 	{
+		// induce output schema 
 		// calculate mapping between expressions and writeFacade columns.
-		// perform the binding???
+		
+		// Expression 
+		// to define trigger events for the aggregation calculation. 
 		// iterate over input data until the end.
 	} 
 	

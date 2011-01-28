@@ -13,7 +13,6 @@ import org.apache.avro.generic.GenericData.Array;
 import org.apache.avro.util.Utf8;
 
 import dremel.common.Drec.AbstractFacade;
-import dremel.common.Drec.Expression;
 import dremel.common.Drec.FileEncoding;
 import dremel.common.Drec.ScannerFacade;
 import dremel.common.Drec.SubName;
@@ -197,7 +196,7 @@ public class WriterFacadeImpl extends AbstractFacade implements WriterFacade {
 		populateIsomorphicWritersTreeRecursive(orecDestSchema, wtree, orecDestSchema
 				.getElementType().getName(), false);
 
-		ScannerFacade.Tree rtree = scanner.rtree;
+		ScannerFacade.ColumnScannersTree rtree = scanner.rtree;
 
 		WriterFacadeImpl.Context ctx = new Context();
 		do {
@@ -227,12 +226,17 @@ public class WriterFacadeImpl extends AbstractFacade implements WriterFacade {
 			throws IOException, InvocationTargetException {
 		drecData = new GenericData.Array<GenericRecord>(10, drecSchema);
 		
+		
+		
 		WriterFacadeImpl.WriterTree wtree = new WriterTree(0, true);
 		
 		populateIsomorphicWritersTreeRecursive(query.outSchema, wtree, orecDestSchema
 				.getElementType().getName(), false);
 		
-		ScannerFacade.Tree rtree = query.scanner.rtree;
+		// link expressions in the query (execution plan) to the output columns in the  
+		linkExpressionsToOutput(query, wtree);
+		
+		ScannerFacade.ColumnScannersTree rtree = query.scanner.rtree;
 
 		//NEXTTODO: this context and advance rtree (reader tree) code snippet must be transfered into query
 		//class
@@ -252,6 +256,30 @@ public class WriterFacadeImpl extends AbstractFacade implements WriterFacade {
 		Drec.writeData(drecData, drecSchema, drecDataFile, drecDestEncoding);
 	}
 
+	private void linkExpressionsToOutput(Query query, WriterTree wtree) {
+		
+		
+		boolean atLeastOneLinkFound = false;
+		// to iterate over all expressions in the query
+		// find match for them in the writer tree  and link
+		
+		for(String alias : query.expressions.keySet())
+		{			
+			ColumnWriter columnWriter = (ColumnWriter)wtree.getColumnByName(alias);
+			if(columnWriter != null)
+			{
+				columnWriter.expression = query.expressions.get(alias);
+				atLeastOneLinkFound = true;
+			}
+		}
+	 
+		if(!atLeastOneLinkFound)
+		{
+			throw new RuntimeException("No links found");
+		}
+		
+	}
+
 	public static final class Context {
 		boolean isEmpty = true;
 		boolean isChanged = false;
@@ -259,9 +287,9 @@ public class WriterFacadeImpl extends AbstractFacade implements WriterFacade {
 		int nextLevel = 0;
 	};
 
-	private void advanceRtreeRecursive(ScannerFacade.Tree rtree, WriterFacadeImpl.Context ctx) {
+	private void advanceRtreeRecursive(ScannerFacade.ColumnScannersTree rtree, WriterFacadeImpl.Context ctx) {
 
-		for (ScannerFacade.Tree t : rtree.children.values()) {
+		for (ScannerFacade.ColumnScannersTree t : rtree.children.values()) {
 			advanceRtreeRecursive(t, ctx);
 		}
 
@@ -301,7 +329,7 @@ public class WriterFacadeImpl extends AbstractFacade implements WriterFacade {
 		return false;
 	}
 
-	private void copy(ScannerFacade.Tree rtree, WriterFacadeImpl.WriterTree wtree) {
+	private void copy(ScannerFacade.ColumnScannersTree rtree, WriterFacadeImpl.WriterTree wtree) {
 		for (Map.Entry<String, ColumnWriter> ws : wtree.scalars.entrySet()) {
 			ScannerFacade.ColumnScanner s = rtree.scalars.get(ws.getKey());
 			if (s.isChanged) {
@@ -313,12 +341,12 @@ public class WriterFacadeImpl extends AbstractFacade implements WriterFacade {
 			}
 		}
 		for (Map.Entry<String, WriterFacadeImpl.WriterTree> wt : wtree.children.entrySet()) {
-			ScannerFacade.Tree rt = rtree.children.get(wt.getKey());
+			ScannerFacade.ColumnScannersTree rt = rtree.children.get(wt.getKey());
 			copy(rt, wt.getValue());
 		}
 	}
 
-	private void populateIsomorphicWritersTreeRecursive(Schema orecSchema,
+	private  void populateIsomorphicWritersTreeRecursive(Schema orecSchema,
 			WriterFacadeImpl.WriterTree wtree, String fromName, boolean fromArray) {
 		switch (orecSchema.getType()) {
 		case RECORD:
