@@ -14,23 +14,28 @@
  * limitations under the License.Ope
  */
 
-
 package dremel.common;
 
 /**
+ *
+ * This is parser-related class. 
+ * This class represent a node in abstract syntax tree in dremel project
+ * 
+ * See ANTLR reference/books for more information.
  *
  * @author camuelg
  */
 
 import org.antlr.runtime.Token;
 import org.antlr.runtime.tree.CommonTree;
-public class AstNode  extends CommonTree{
-    public AstNode(Token payload) {
-        super(payload);
-    }
-    
-    public String toString()
-    {
-    	return super.toString();
-    }   
+
+public final class AstNode extends CommonTree {
+	public AstNode(Token payload) {
+		super(payload);
+	}
+
+	@Override
+	public String toString() {
+		return super.toString();
+	}
 }

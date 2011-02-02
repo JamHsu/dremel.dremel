@@ -1,19 +1,31 @@
+/**
+ * Copyright 2010, Petascan Ltd.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.Ope
+ */
+
 package dremel.common;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
-import org.antlr.runtime.RecognitionException;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericArray;
 import org.apache.avro.generic.GenericData;
@@ -31,21 +43,27 @@ import org.apache.avro.io.JsonDecoder;
 import org.apache.avro.io.JsonEncoder;
 import org.apache.avro.util.Utf8;
 
-import dremel.common.Drec.AbstractFacade;
-import dremel.common.Drec.ScannerFacade.ColumnScanner;
-
-
-
+/**
+*
+* This class represents Dremel Nested Columnar Dataset and encapsulates all related functionality.
+* Currently this class is heavily intervened with Avro. In fact it is fair to say it is a Dremel 
+* extension to Avro framework.
+* 
+* Therefore in order to understand the code in this file one must first master Avro and 
+* particularly generic access (GenericRecord and GenericArray and etc.) 
+* 
+* TODO: This class must be separated completely from Avro artifacts in future and support 
+* for other serialization frameworks must be added. Particularly support for Protobuf framework
+* is very wanted to be able to support examples from Dremel paper written in Protobuf format. 
+*
+* @author camuelg
+*/
 public final class Drec {
 	enum ColumnType {
 		INT, STRING
 	}
 
-	static final class Table {
-		Table(String table) {};
-	}
-
-
+	//Element of fully qualified column name.  
 	static final class SubName {
 
 		final boolean isArray;
@@ -58,31 +76,41 @@ public final class Drec {
 		}
 	}
 
+	static final class Table {
+		Table(String table) {};
+	}
+
+	//File encodings for Avro
 	public static enum FileEncoding {
 		JSON, BIN
 	}
 
+	//Dremel dataset functionality consists of few distinct sets called facades. For example
+	//facade for scanning data, facade for writing data and etc. This class is a base class 
+	//for such facades and contains common functionality among all facades
 	static abstract class AbstractFacade {
 		// TODO override toString() to ease debugging
-		/**
-		 * This class correspond to the  field in the Dremel paper example 	
-		 */
+		
+		//This class correspond to the field in the Dremel paper example
 		static abstract class Column {
-			
+
 			GenericRecord drecColumn;
 			final Schema drecColumnSchema;
 			boolean isArray;
 			int maxDefenitionLevel;
-			List<SubName> name; // name of this field and all above fields in reverse order
-			GenericArray<GenericRecord> nameArray; // name of this field and all above fields in reverse order
+			List<SubName> name; // name of this field and all enclosing fields
+			GenericArray<GenericRecord> nameArray; // name of this field and all enclosing fields
 			String nameString;
-			GenericArray<Integer> rep; // repetition "sub column", references to the drecColumn
-			GenericArray<Integer> def; // definition "sub column", references to the drecColumn
-			
-			// pointer to the current typed array. it is referanced or valInt or valString.
+			GenericArray<Integer> rep; // repetition "sub column", references to
+										// the drecColumn
+			GenericArray<Integer> def; // definition "sub column", references to
+										// the drecColumn
+
+			// pointer to the current typed array. it is referanced or valInt or
+			// valString.
 			GenericArray<Object> val;
-			
-			// only one of the typed  array is actually used
+
+			// only one of the typed array is actually used
 			GenericArray<Integer> valInt;
 			GenericArray<Utf8> valString;
 			ColumnType valType;
@@ -92,35 +120,38 @@ public final class Drec {
 			}
 
 			/**
-			 * Calculate maximum definition level for the given column
-			 * It is calculated as number of "array elements" in the path.  According to the paper
-			 * the definition level is number of undefined values in the path that are actually defined,
-			 * So maximum possible value - it is number of values that are optional or repeated. Both of them
-			 * are represented as arrays. Missing value will be represented as array of size 0. 
+			 * Calculate maximum definition level for the given column It is
+			 * calculated as number of "array elements" in the path. According
+			 * to the paper the definition level is number of undefined values
+			 * in the path that are actually defined, So maximum possible value
+			 * - it is number of values that are optional or repeated. Both of
+			 * them are represented as arrays. Missing value will be represented
+			 * as array of size 0.
 			 * 
-			 * @param namePath - array of field definitions
+			 * @param namePath
+			 *            - array of field definitions
 			 * @return - max definition level
 			 */
-			protected static int getMaxDefinitionLevelFromColumnName(GenericArray<GenericRecord> namePath)
-			{
+			protected static int getMaxDefinitionLevelFromColumnName(
+					GenericArray<GenericRecord> namePath) {
 				int resultLevel = -1;
-				for(GenericRecord  nextNamePart : namePath)
-				{
+				for (GenericRecord nextNamePart : namePath) {
 					Boolean isArray = ((Integer) nextNamePart.get("IsArray")) == 1;
 					if (isArray) {
-						resultLevel++;						
+						resultLevel++;
 					}
 				}
-				
-				assert(resultLevel>=0);
-				
+
+		//		assert(resultLevel>=0);
+
 				return resultLevel;
 			}
-			public String toString()
-			{
-				return  null;//"AbstractFacade.Column. name: " + formatName + 
+
+			@Override
+			public String toString() {
+				return null;// "AbstractFacade.Column. name: " + formatName +
 			}
-			
+
 			@SuppressWarnings("unchecked")
 			protected void identifyType() {
 				String type = ((Utf8) drecColumn.get("ValType")).toString();
@@ -146,7 +177,7 @@ public final class Drec {
 				this.level = level;
 				this.isArray = isArray;
 			};
-						
+
 			public Column getColumnByName(String columnName) {
 				// TODO Auto-generated method stub
 				Column res = getColumnByNameRecursive(columnName, this);
@@ -155,44 +186,37 @@ public final class Drec {
 
 			private Column getColumnByNameRecursive(String columnName,
 					ColumnTree<SCALAR, TREE> subtree) {
-				
-				
+
 				/*
-				for(String scalarName : subtree.scalars.keySet())
-				{
-					System.out.println("scalar found: "+scalarName);
-				} 
-					
-				System.out.println("");
-				*/
-				
-				if(subtree.scalars.containsKey(columnName))
-				{
-					return (Column)subtree.scalars.get(columnName); 
+				 * for(String scalarName : subtree.scalars.keySet()) {
+				 * System.out.println("scalar found: "+scalarName); }
+				 * 
+				 * System.out.println("");
+				 */
+
+				if (subtree.scalars.containsKey(columnName)) {
+					return (Column) subtree.scalars.get(columnName);
 				}
-				
-				for(String childSubtreeName : subtree.children.keySet())
-				{
+
+				for (String childSubtreeName : subtree.children.keySet()) {
 					Column columnFound = getColumnByNameRecursive(columnName,
-							(ColumnTree<SCALAR, TREE>)subtree.children.get(childSubtreeName));
-					if(columnFound != null)
-					{
-						return columnFound; 
+							(ColumnTree<SCALAR, TREE>) subtree.children
+									.get(childSubtreeName));
+					if (columnFound != null) {
+						return columnFound;
 					}
 				}
 				return null;
 			}
-		
-			
+					
 		}
 
-				
-		
+						
 		@SuppressWarnings("serial")
 		static final class ColumnList<COLUMN> extends ArrayList<COLUMN> {
 		};
 
-		final List<SubName> currentNamePath= new ArrayList<SubName>();
+		final List<SubName> currentNamePath = new ArrayList<SubName>();
 
 		transient int currentNestingLevel;
 
@@ -239,46 +263,45 @@ public final class Drec {
 	}
 
 	/**
-	 * Incapsulates Dremel encoding defined in the paper. Contain the
-	 * input data in form of the tree of column scanners.
+	 * Encapsulates Dremel encoding defined in the paper. Contain the input data
+	 * in form of the tree of column scanners.
+	 * 
 	 * @author David.Gruzman
-	 *
+	 * 
 	 */
 	public static class ScannerFacade extends AbstractFacade {
 
-		// It is a tree of the ColumnScanner objects. 
+		// It is a tree of the ColumnScanner objects.
 		ColumnScannersTree rtree = new ColumnScannersTree(0, true);
 		// Schema of the whole dataset accessed through the ScannerFacade
 		Schema dataSetSchema = null;
 
-		public Schema getDataSetSchema()
-		{
+		public Schema getDataSetSchema() {
 			return dataSetSchema;
 		}
-		
+
 		// iterate over the tree of columns and print it.
-		public String toString()
-		{
+		@Override
+		public String toString() {
 			StringBuilder result = new StringBuilder();
 			prettyPrintRecursive(rtree, result);
-			
-			return result.toString();				
+
+			return result.toString();
 		}
-		
-		public void prettyPrintRecursive(ColumnScannersTree subtree, StringBuilder result)
-		{
-			for(String columnName : subtree.scalars.keySet())
-			{
-				result.append("Column in the level " + subtree.level + " is "+columnName + "\n");								
+
+		public void prettyPrintRecursive(ColumnScannersTree subtree,
+				StringBuilder result) {
+			for (String columnName : subtree.scalars.keySet()) {
+				result.append("Column in the level " + subtree.level + " is "
+						+ columnName + "\n");
 			}
-			for(String child : subtree.children.keySet())
-			{
+			for (String child : subtree.children.keySet()) {
 				ColumnScannersTree childTree = subtree.children.get(child);
 				prettyPrintRecursive(childTree, result);
 			}
-			
+
 		}
-		
+
 		final static public class ColumnScanner extends Column {
 
 			private Iterator<Integer> defIterator;
@@ -295,9 +318,11 @@ public final class Drec {
 			boolean isChanged;
 
 			/**
-			 * 	
-			 * @param drecColumnSchema 
-			 * @param drecColumn_  Dremel column with string or int value + columns of definitions and repetition levels
+			 * 
+			 * @param drecColumnSchema
+			 * @param drecColumn_
+			 *            Dremel column with string or int value + columns of
+			 *            definitions and repetition levels
 			 */
 			@SuppressWarnings("unchecked")
 			ColumnScanner(Schema drecColumnSchema, GenericRecord drecColumn_) {
@@ -321,8 +346,8 @@ public final class Drec {
 				valIterator = val.iterator();
 
 				identifyName();
-				
-				maxDefenitionLevel = getMaxDefinitionLevelFromColumnName(nameArray); 
+
+				maxDefenitionLevel = getMaxDefinitionLevelFromColumnName(nameArray);
 
 				// prime rep and def columns
 				preloadNext();
@@ -370,8 +395,8 @@ public final class Drec {
 
 			@Override
 			public String toString() {
-				return nameString + "=" + "(rep=" + curRep + ", def="
-						+ curDef + ", val=" + curVal + ")";
+				return nameString + "=" + "(rep=" + curRep + ", def=" + curDef
+						+ ", val=" + curVal + ")";
 			}
 
 			public int getNextRep() {
@@ -395,7 +420,7 @@ public final class Drec {
 
 			void identifyName() {
 				name = new ArrayList<SubName>();
-				//level = -1;
+				// level = -1;
 				StringBuffer buf = new StringBuffer();
 				for (GenericRecord subName : nameArray) {
 					if (buf.length() != 0)
@@ -405,16 +430,17 @@ public final class Drec {
 					name.add(new SubName(s, isArray));
 					buf.append(s);
 					if (isArray) {
-					//	level++;
+						// level++;
 						buf.append("[]");
 					}
 				}
 				nameString = buf.toString();
-				// QUESTION - why level can not be left 01, if there are no arrays
-				/*if (level < 0)  // 
-					throw new RuntimeException( 
-							"Outer enclosing array is missing");
-							*/
+				// QUESTION - why level can not be left 01, if there are no
+				// arrays
+				/*
+				 * if (level < 0) // throw new RuntimeException(
+				 * "Outer enclosing array is missing");
+				 */
 			};
 		};
 
@@ -444,8 +470,8 @@ public final class Drec {
 		}
 
 		@SuppressWarnings("unchecked")
-		private static Object exportToOrecRecursive(String name, ColumnScannersTree rtree,
-				Schema orecSchema, int rep) {
+		private static Object exportToOrecRecursive(String name,
+				ColumnScannersTree rtree, Schema orecSchema, int rep) {
 			switch (orecSchema.getType()) {
 			case RECORD:
 				boolean isFieldsEmpty = true;
@@ -494,12 +520,13 @@ public final class Drec {
 
 		private void populateIsomorphicReadersTree(Schema orecSchema,
 				Schema drecColumnSchema,
-				Iterator<GenericRecord> drecDataIterator, ColumnScannersTree rtree,
-				String fromName, boolean fromArray) {
+				Iterator<GenericRecord> drecDataIterator,
+				ColumnScannersTree rtree, String fromName, boolean fromArray) {
 			switch (orecSchema.getType()) {
 			case RECORD:
 				push(fromName, fromArray);
-				ColumnScannersTree subTree = new ColumnScannersTree(currentNestingLevel, fromArray);
+				ColumnScannersTree subTree = new ColumnScannersTree(
+						currentNestingLevel, fromArray);
 				for (Schema.Field field : orecSchema.getFields()) {
 					populateIsomorphicReadersTree(field.schema(),
 							drecColumnSchema, drecDataIterator, subTree,
@@ -549,27 +576,18 @@ public final class Drec {
 			if(subtree.scalars.containsKey(columnName))
 			{
 				return subtree.scalars.get(columnName); 
-			}
-			
-			for(String childSubtreeName : subtree.children.keySet())
-			{
-				ColumnScanner scannerFound = getColumnByNameRecursive(columnName,
-						subtree.children.get(childSubtreeName));
-				if(scannerFound != null)
-				{
-					return scannerFound; 
-				}
-			}
-			return null;
-		}
 		*/
 	}
 
 	/**
 	 * Read given avro file as array of avro records.
-	 * @param schema - schema of the data
-	 * @param file - file to read from
-	 * @param encoding - encoding to be used (JSON or BIN)
+	 * 
+	 * @param schema
+	 *            - schema of the data
+	 * @param file
+	 *            - file to read from
+	 * @param encoding
+	 *            - encoding to be used (JSON or BIN)
 	 * @return array of all records in the file
 	 * @throws IOException
 	 */
@@ -591,13 +609,18 @@ public final class Drec {
 		return inData;
 	}
 
-
 	/**
-	 * Saves given data under given schema, with given encoding, using Avro framework
-	 * @param data - array of avro records.
-	 * @param schema - schem to which records conform
-	 * @param file = file to save data
-	 * @param encoding - incoding o be used. it can be JSON or BIN
+	 * Saves given data under given schema, with given encoding, using Avro
+	 * framework
+	 * 
+	 * @param data
+	 *            - array of avro records.
+	 * @param schema
+	 *            - schem to which records conform
+	 * @param file
+	 *            = file to save data
+	 * @param encoding
+	 *            - incoding o be used. it can be JSON or BIN
 	 * @throws IOException
 	 */
 	public static void writeData(Array<GenericRecord> data, Schema schema,
@@ -630,12 +653,13 @@ public final class Drec {
 		return Schema.parse(new FileInputStream(file));
 	}
 
-	static public Schema getSchema(String filename){
-		
+	static public Schema getSchema(String filename) {
+
 		try {
 			return Schema.parse(new FileInputStream(getFile(filename)));
 		} catch (Exception e) {
-			throw new RuntimeException("Loading schema from the file "+filename+" failed ", e);
+			throw new RuntimeException("Loading schema from the file "
+					+ filename + " failed ", e);
 		}
 	}
 

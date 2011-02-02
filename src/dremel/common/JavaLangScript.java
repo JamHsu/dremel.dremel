@@ -18,10 +18,13 @@
 package dremel.common;
 
 import java.lang.reflect.InvocationTargetException;
+
 import org.codehaus.commons.compiler.CompilerFactoryFactory;
 import org.codehaus.commons.compiler.IScriptEvaluator;
 
 /**
+ *
+ * Super fast java compiler
  *
  * @author camuelg
  */

@@ -1,0 +1,3 @@
+{"type": "array", "items": {"name": "Document", "type": "record", "fields" : [      
+     {"name":"Links", "type": {"type": "array", "items": {"name": "Links", "type":"record", "fields" : [           
+           {"name":"Forward", "type": {"type": "array", "items": {"name": "Forward", "type": "int"}}}]}}}]}}

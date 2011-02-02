@@ -1,0 +1,1 @@
+select Links.Forward, Links.Backward from table

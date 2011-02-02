@@ -2,6 +2,7 @@ package dremel.common;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -11,7 +12,7 @@ import org.apache.avro.Schema;
 import dremel.common.Drec.ScannerFacade;
 import dremel.common.Drec.Table;
 import dremel.common.WriterFacadeImpl.WriterTree;
-import dremel.playground.AvroExperiments;
+import dremel.testHelpers.AvroExperiments;
 
 
 /**
@@ -35,6 +36,14 @@ public final class Query {
     	throw new RuntimeException(mes + "  in line: "+node.getLine()+" at position "+node.getCharPositionInLine());
     }
     
+    
+    public static AstNode getSelectClause(AstNode selectQueryNode) {
+    	assert(selectQueryNode.getType() == BqlParser.N_SELECT_STATEMENT);
+    	AstNode selectClause = (AstNode)selectQueryNode.getChild(1);
+    	assert(selectClause.getType() == BqlParser.N_SELECT);
+		return selectClause;
+	}
+    
     void parseSelectStatement(AstNode node) {
     	//System.out.println(node.toStringTree());
     	
@@ -42,7 +51,7 @@ public final class Query {
     	int count = node.getChildCount();
     	assert((count >= 2) && (count <= 3));
     	parseFromClause((AstNode)node.getChild(0));
-    	parseSelectClause((AstNode)node.getChild(1));
+    	parseSelectClause(getSelectClause(node));
 		parseWhereClause((AstNode)node.getChild(2));
     };
     void parseFromClause(AstNode node) {
@@ -115,9 +124,28 @@ public final class Query {
      * @return column name
      */
     public static String extractColumnNameFromSingleColumnExpression(AstNode node) {
+    	System.out.println(node.toStringTree());
+    	AstNode expressionNode = (AstNode) node.getChild(0);
+    	assert(expressionNode.getType() == BqlParser.N_EXPRESSION);
+    
+    	AstNode columnNode = (AstNode) expressionNode.getChild(0);
+    	assert(columnNode.getType() == BqlParser.N_COLUMN);
+    	StringBuilder dotSeparatedColumnName = new StringBuilder();
     	
-    	AstNode columnNode = (AstNode) node.getChild(0).getChild(0).getChild(0).getChild(0);    	
-		return columnNode.getText();
+    	for(int i=0; i<columnNode.getChildCount(); i++)
+    	{
+    		AstNode nextChild = (AstNode) columnNode.getChild(i);
+    	
+    		assert(nextChild.getType() == BqlParser.N_COLUMN_NAME);
+    		dotSeparatedColumnName.append(nextChild.getChild(0));
+    
+    		if(i !=columnNode.getChildCount()-1)
+    		{
+    			dotSeparatedColumnName.append(".");
+    		}
+    	}
+    	    	
+		return dotSeparatedColumnName.toString();
 	}
 
 	private boolean parseWithinRecordClause(AstNode node) {
