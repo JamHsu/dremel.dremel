@@ -63,7 +63,7 @@ public final class Drec {
 		INT, STRING
 	}
 
-	//Element of fully qualified column name.  
+	//SIngle element of fully qualified column name.  
 	static final class SubName {
 
 		final boolean isArray;

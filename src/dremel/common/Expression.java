@@ -20,7 +20,6 @@ import java.lang.reflect.InvocationTargetException;
 
 import dremel.common.Drec.ScannerFacade;
 import dremel.common.Drec.ScannerFacade.ColumnScanner;
-import dremel.testHelpers.AvroExperiments;
 
 /**
  * 
