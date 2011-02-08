@@ -1,3 +1,7 @@
-{"type": "array", "items": {"name": "Document", "type": "record", "fields" : [      
-     {"name":"Links", "type": {"type": "array", "items": {"name": "Links", "type":"record", "fields" : [           
-           {"name":"Forward", "type": {"type": "array", "items": {"name": "Forward", "type": "int"}}}]}}}]}}
+{"type":"array","items":
+	{"type":"record","name":"Document","fields":[{"name":"Name","type":
+		{"type":"array","items":
+			{"type":"record","name":"Name","fields":[{"name":"Url","type":{"type":"array","items":"string"}}]}}},
+				{"name":"Links","type":{"type":"array","items":{"type":"record","name":"Links","fields":
+					[{"name":"Backward","type":{"type":"array","items":"int"}},
+					{"name":"Forward","type":{"type":"array","items":"int"}}]}}}]}}

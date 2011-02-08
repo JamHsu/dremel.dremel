@@ -93,8 +93,7 @@ public final class Query {
     void parseCreateColumn(AstNode node) {
     	StringBuffer alias = new StringBuffer();
     	
-    	StringBuffer within = new StringBuffer();
-    	boolean isWithinRecord = false;
+    	StringBuffer within = new StringBuffer();    	
     	assert(node.getType() == BqlParser.N_CREATE_COLUMN);
     	int count = node.getChildCount();
     	assert((count >= 1) && (count <= 3));
@@ -107,7 +106,7 @@ public final class Query {
     		else if(node.getChild(1).getType() == BqlParser.N_WITHIN)
     			parseWithinClause((AstNode)node.getChild(1), within);
     		else if(node.getChild(1).getType() == BqlParser.N_WITHIN_RECORD)
-    			isWithinRecord = parseWithinRecordClause((AstNode)node.getChild(1));
+    			 parseWithinRecordClause((AstNode)node.getChild(1));
     		else {
     				assert(false);
     	  		}
@@ -200,7 +199,7 @@ public final class Query {
 	private Schema inferOutSchema() {
 		// NEXTTODO infer output schema
 		// HARDCODED OUTPUT Schema equals to input schema
-		return AvroExperiments.createUrlOnlySchema();
+		return  InferSchemaAlgorithm.inferSchema(scanner.getDataSetSchema(), queryTreeRootNode);
 	}
 	
 	/**
@@ -215,6 +214,14 @@ public final class Query {
 		// Expression 
 		// to define trigger events for the aggregation calculation. 
 		// iterate over input data until the end.
-	} 
+	}
+	
+    public static AstNode getSelectClause(AstNode selectQueryNode) {
+    	assert(selectQueryNode.getType() == BqlParser.N_SELECT_STATEMENT);
+    	AstNode selectClause = (AstNode)selectQueryNode.getChild(1);
+    	assert(selectClause.getType() == BqlParser.N_SELECT);
+		return selectClause;
+	}
+    
 	
 }
