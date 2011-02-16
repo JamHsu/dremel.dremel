@@ -47,7 +47,7 @@ return se;
 		
 		List<Schema.Field> fields  = new LinkedList<Schema.Field>();
 		
-		// create id field
+		// create id field		
 		Schema UrlElementSchema = Schema.create(Schema.Type.INT);
 		Schema urlFieldSchema = Schema.createArray(UrlElementSchema);
 		
@@ -61,7 +61,7 @@ return se;
 		return schema;
 	}
 	
-	public static Schema createForwardOnlySchema()
+	public static Schema createForwardOnlySchema2()
 	{
 		// create hard coded schema for the q16  results the schmea is simply array of Urls.
 		
@@ -86,7 +86,7 @@ return se;
 	public static void testEquals()
 	{
 		Schema first = createUrlOnlySchema();
-		Schema second = createForwardOnlySchema();
+		Schema second = createForwardOnlySchema2();
 		boolean equals = first.equals(second);
 		if(equals)
 		{

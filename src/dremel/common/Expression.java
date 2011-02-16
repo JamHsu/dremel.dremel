@@ -17,6 +17,10 @@
 package dremel.common;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.LinkedList;
+import java.util.List;
+
+import org.apache.avro.Schema.Type;
 
 import dremel.common.Drec.ScannerFacade;
 import dremel.common.Drec.ScannerFacade.ColumnScanner;
@@ -39,6 +43,20 @@ final class Expression<T> {
 	ScannerFacade.ColumnScanner params[];
 	ScannerFacade.ColumnScanner param;
 
+	
+	List<String> expressionColumnNames = new LinkedList<String>();
+	
+	public List<String> getExpressionColumnNames()
+	{
+		return expressionColumnNames;
+	}
+	
+	public Type getExpressionType()
+	{
+		// TODO to make proper implementation, for now - hard coded INT
+		return Type.INT;
+	}
+	
 	@SuppressWarnings("unchecked")
 	public T evaluate() throws InvocationTargetException {
 		return (T) script.evaluate(params);
@@ -59,6 +77,8 @@ final class Expression<T> {
 
 		String columnName = Query
 				.extractColumnNameFromSingleColumnExpression(expr);
+		
+		expressionColumnNames.add(columnName);
 
 		ColumnScanner selectedColumn = (ColumnScanner) scanner.rtree
 				.getColumnByName(columnName);

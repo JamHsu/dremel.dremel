@@ -28,41 +28,28 @@ import org.apache.avro.Schema.Type;
 public class InferSchemaAlgorithm {
 		
 	/**
-	 * This is main method of this class. It takes input Avro schema and create avro schema which
-	 * matches the result of the given query
-	 * @param inputSchema - Avro schema to be processed
-	 * @param query - query to be used
-	 * @return Avro schema of the query result
-	 */
-	public static Schema inferSchema(Schema inputSchema, String query)
-	{
-		// parse query		
-		AstNode tmpQueryTreeRootNode = DremelParser.parseBql(query);
-		
-		// delegate to inferSchema
-		return inferSchema(inputSchema, tmpQueryTreeRootNode);
-	}
-	
-	 /**
+	 * This is a main method of this class. It takes schema of the input data, the Query, which is used to get
+	 * the query semantics and produce Avro schema of the output.
 	 * @param inputSchema
 	 * @param query
+	 * @return
 	 */
-	public static Schema inferSchema(Schema inputSchema, AstNode query)
+	public static Schema inferSchema(Schema inputSchema, Query query)
 	{ 		
 		// split select clause into separate expression.
-		Map<String, AstNode> selectClauseExpressions = getSelectClauseExpressions(query);
-		
-		Map<String, Schema.Type> expressionTypes = induceExpressionTypes(selectClauseExpressions);
-		
+		Map<String, Expression<Object>> selectClauseExpressions = query.expressions;
+		assert( selectClauseExpressions.size()>0);
+				
 		// maps each expression to the path in the schema where the result of this expression should be emitted
 		// by path in schema we mean "slim" schema from the root to the given column
 		Map<String, SchemaTree> aliasToMostSignificantColumnPaths =  mapExpressionsToSignificanSchemaNodePaths(inputSchema, selectClauseExpressions);
 		
 		// build schema as a merge of paths from the expressions
-		Schema outSchema = buildSchemaAsMergeOfPaths(aliasToMostSignificantColumnPaths, expressionTypes);
+		Schema outSchema = buildSchemaAsMergeOfPaths(aliasToMostSignificantColumnPaths, selectClauseExpressions);
 							
 		return outSchema;
 	}
+	
 		
 	/**
 	 * This method should build schema which includes all paths. In the end of each path it should 
@@ -73,7 +60,7 @@ public class InferSchemaAlgorithm {
 	 */
 	private static Schema buildSchemaAsMergeOfPaths(
 			Map<String, SchemaTree> aliasToMostSignificantColumnPaths,
-			Map<String, Type> expressionTypes) {
+			Map<String, Expression<Object>> expressionTypes) {
 
 		// build schema objects for all expression nodes - as a result we should get paths ready for the merge
 			
@@ -88,6 +75,7 @@ public class InferSchemaAlgorithm {
 	private static SchemaTree buildTreeFromPaths(
 			Map<String, SchemaTree> aliasToMostSignificantColumnPaths) {
 		
+		assert(aliasToMostSignificantColumnPaths.size()>0);
 		SchemaTree resultTree = null;
 		
 		boolean isFirst = true;
@@ -121,21 +109,6 @@ public class InferSchemaAlgorithm {
 	}
 
 
-	private static Map<String, Type> induceExpressionTypes(
-			Map<String, AstNode> selectClauseExpressions) {
-		
-		Map<String, Type> result = new HashMap<String, Type>();
-		
-		for(String alias : selectClauseExpressions.keySet())
-		{
-			// can be only primitive schema types
-			Schema.Type expressionType = induceExpressionType(selectClauseExpressions.get(alias));
-			result.put(alias, expressionType);
-		}
-
-		return result;
-	}
-	
 	/**
 	 * This method should analyse the expression in order to determine the place in the input schema  where result of this
 	 * expression should be emitted.
@@ -147,8 +120,8 @@ public class InferSchemaAlgorithm {
 	 * @return map from expression aliases to the paths in the inputSchema from the root to.
 	 */
 	private static Map<String, SchemaTree> mapExpressionsToSignificanSchemaNodePaths(			
-			Schema inputSchema, Map<String, AstNode> selectClauseExpressions) {
-		
+			Schema inputSchema, Map<String, Expression<Object>> selectClauseExpressions) {
+				
 		Map<String, SchemaTree> result = new HashMap<String, SchemaTree>();
 		
 		for(String alias : selectClauseExpressions.keySet())
@@ -164,16 +137,16 @@ public class InferSchemaAlgorithm {
 	 * This method should analyse the given expression,find the column which determine the place where expression should 
 	 * emit its output. 
 	 * @param inputSchema - schema of the input data for the query, which contain the given expression
-	 * @param astNode - AST node for the expression to be analysed
-	 * @param alias - alias of the expression, used in the query. (probabbly redundant - to delete if can be read from the AST node)
+	 * @param expression - expression object to be analyzed
+	 * @param alias - alias of the expression, used in the query. 
 	 * @return node in the inputSchemam which corresponds to the result of the given expression
 	 */
 	private static SchemaTree getSignificantColumnPathForExpression(Schema inputSchema,
-			AstNode expressionNode, String alias) {
+			Expression<Object> expression, String alias) {
 		// to deduce expression's type
 		 
 		// to get list of all columns in the expression
-		List<String> columnNames = getColumnNamesFromExpression(expressionNode);
+		List<String> columnNames = expression.getExpressionColumnNames();
 		// for each column to find corresponding place in the schema
 		Map<String, SchemaTree> columnToPathInSchema = mapColumnsToPathInSchema(inputSchema, columnNames);
 		// for each column to find repetition level
@@ -267,38 +240,6 @@ public class InferSchemaAlgorithm {
 			result.add(element);
 		}
 		return result;
-	}
-	
-	private static List<String> getColumnNamesFromExpression(
-			AstNode expressionNode) {
-		// TODO To make proper implementation - for now - works with single columns only
-		List<String> columnNames = new LinkedList<String>();
-		columnNames.add(Query.extractColumnNameFromSingleColumnExpression(expressionNode));
-		
-		return columnNames;
-	}
-
-	private static Type induceExpressionType(AstNode expressionNode) {
-		// TODO To make proper implementation for now - hard coded int
-		return Schema.Type.INT;
-	}
-
-	// TODO Make real implementation. For now - will process correctly only single columns as expressions
-	private static Map<String, AstNode> getSelectClauseExpressions(AstNode query) {
-		
-		AstNode selectClause = Query.getSelectClause(query);
-		
-		Map<String, AstNode> aliasToSelectExpressions = new HashMap<String, AstNode>();
-		
-		int count = selectClause.getChildCount();
-    	assert(count > 0);
-    	for(int i = 0; i < count; i++) {
-    		AstNode currentExpression = (AstNode)selectClause.getChild(i);    		
-    		String columnname = Query.extractColumnNameFromSingleColumnExpression(currentExpression);	
-    		aliasToSelectExpressions.put(columnname, currentExpression);
-    	}
-		
-    	return aliasToSelectExpressions;
 	}
 
 }

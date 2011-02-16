@@ -50,7 +50,6 @@ public final class Query {
     	throw new RuntimeException(mes + "  in line: "+node.getLine()+" at position "+node.getCharPositionInLine());
     }
     
-    
     void parseSelectStatement(AstNode node) {
     	assert(node.getType() == BqlParser.N_SELECT_STATEMENT);
     	int count = node.getChildCount();
@@ -126,7 +125,7 @@ public final class Query {
      * And return the name of the column. In this case: Url
      * @param node - AST node to look for the column name
      * @return column name
-     */
+     */   
     public static String extractColumnNameFromSingleColumnExpression(AstNode node) {
     	System.out.println(node.toStringTree());
     	AstNode expressionNode = (AstNode) node.getChild(0);
@@ -191,15 +190,15 @@ public final class Query {
     {
     	this.scanner = scanner;        
         queryTreeRootNode = root;
-        
-        outSchema = inferOutSchema();
+
         parseSelectStatement(queryTreeRootNode);
+        outSchema = inferOutSchema();
     }
     
 	private Schema inferOutSchema() {
 		// NEXTTODO infer output schema
 		// HARDCODED OUTPUT Schema equals to input schema
-		return  InferSchemaAlgorithm.inferSchema(scanner.getDataSetSchema(), queryTreeRootNode);
+		return  InferSchemaAlgorithm.inferSchema(scanner.getDataSetSchema(), this);
 	}
 	
 	/**
@@ -208,7 +207,7 @@ public final class Query {
 	 */
 	public void executeQuery(WriterFacade writeFacade)
 	{
-		// induce output schema 
+		// infer output schema 
 		// calculate mapping between expressions and writeFacade columns.
 		
 		// Expression 

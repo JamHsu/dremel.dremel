@@ -233,7 +233,7 @@ public class AvroTest {
 				/*input*/ tempDrecFile1, encoding);
 		System.out.println("Scanner is "+ scanner1.toString());
 		
-		writer2.importFromQuery(orecSchema, new Query(scanner1, "select Forward from table"), 
+		writer2.importFromQuery(orecSchema, new Query(scanner1, "select Links.Forward from table"), 
 				orecSchema, encoding);
 		writer2 = null;
 	
