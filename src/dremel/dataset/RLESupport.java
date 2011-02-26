@@ -1,7 +1,8 @@
 package dremel.dataset;
 
 /**
- * This interface should be available from the ColumnReader if the data is RLE compressed.
+ * This interface should be available from the ColumnReader if the data is RLE compressed. Not intended to be used
+ * in Metaxa.
  * @author David.Gruzman
  *
  */

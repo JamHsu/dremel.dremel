@@ -88,7 +88,7 @@ public class SchemaTree
 		return newSchema;			
 	}
 	
-	private static String getArrayName(String elementName) {			
+	public static String getArrayName(String elementName) {			
 		return ARRAY_PREFIX+elementName;
 	}
 

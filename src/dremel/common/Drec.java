@@ -179,8 +179,9 @@ public final class Drec {
 			};
 
 			public Column getColumnByName(String columnName) {
-				// TODO Auto-generated method stub
-				Column res = getColumnByNameRecursive(columnName, this);
+				// TODO - to make it better
+				// we assume that schema is always array so its upper name is not important  				
+				Column res = getColumnByNameRecursive("SCGEMA_NAME."+columnName, this);
 				return res;
 			}
 
@@ -199,7 +200,7 @@ public final class Drec {
 				}
 
 				for (String childSubtreeName : subtree.children.keySet()) {
-					Column columnFound = getColumnByNameRecursive(columnName,
+					Column columnFound = getColumnByNameRecursive(cutHead(columnName),
 							(ColumnTree<SCALAR, TREE>) subtree.children
 									.get(childSubtreeName));
 					if (columnFound != null) {
@@ -207,6 +208,21 @@ public final class Drec {
 					}
 				}
 				return null;
+			}
+
+			// remove heading element from the dot separated list
+			private String cutHead(String columnName) {
+				String[] elements = columnName.split("\\.");
+				StringBuilder res = new StringBuilder();
+				for(int i =1; i<elements.length; i++)
+				{
+					res.append(elements[i]);
+					if(i!=elements.length-1 )
+					{
+						res.append(".");
+					}
+				}
+				return res.toString();
 			}
 					
 		}

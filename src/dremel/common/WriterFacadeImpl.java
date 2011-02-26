@@ -94,7 +94,6 @@ public class WriterFacadeImpl extends AbstractFacade implements WriterFacade {
 		public WriterTree(int level, boolean isArray) {
 			super(level, isArray);
 		}
-
 	};
 
 	public WriterFacadeImpl(Schema drecSchema, Array<GenericRecord> drecData) {
@@ -270,13 +269,12 @@ public class WriterFacadeImpl extends AbstractFacade implements WriterFacade {
 			{
 				columnWriter.expression = query.expressions.get(alias);
 				atLeastOneLinkFound = true;
+			}else
+			{
+				throw new RuntimeException("Expression was not linked to output : "+alias);
 			}
 		}
-	 
-		if(!atLeastOneLinkFound)
-		{
-			throw new RuntimeException("No links found");
-		}
+	 		
 		
 	}
 

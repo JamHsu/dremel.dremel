@@ -1,3 +1,19 @@
+/**
+   Copyright 2010, BigDataCraft.Com Ltd.
+   David Gruzman
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.Ope
+*/
 package dremel.dataset.impl;
 
 import java.io.DataInputStream;
@@ -5,7 +21,12 @@ import java.io.EOFException;
 import java.io.FileInputStream;
 import java.io.IOException;
 
+import dremel.dataset.ColumnMetaData;
+import dremel.dataset.ColumnMetaData.ColumnType;
+import dremel.dataset.impl.encoding.EncodingFactory;
+import dremel.dataset.impl.encoding.StreamDecoder;
 import dremel.dataset.ColumnReader;
+
 /**
  * It is basic implementation of the ColumnReader interface. The column is represented by three files:
  * file with data, file with repetition levels and file with definition levels 
@@ -14,16 +35,14 @@ import dremel.dataset.ColumnReader;
  */
 public class ColumnReaderImpl implements ColumnReader {
 
+	ColumnMetaData columnMetaData = null; 
 
-	ColumnType columnType;
-	ColumnFileSet columnFileSet;
 	
 	DataInputStream dataInput;
 	DataInputStream  definitionInput;
 	DataInputStream  repetitionInput;
 		
-	
-	byte maximumDefinitionLevel;
+		
 	//	
 	int currentIntValue;
 	byte currentByteValue;
@@ -37,13 +56,7 @@ public class ColumnReaderImpl implements ColumnReader {
 	boolean isNextCalled = false;
 	transient byte[]singleByteArray = new byte[1];
 
-	
-	
-	//---------------------------------- constants -----------------------------------
-
-	
-	
-	
+		
 	/**
 	 * Constructs the ColumnReaderImpl over set of files.
 	 * @param forColumnType - expected type of the column. It will be verified against the magic bytes of the file
@@ -52,11 +65,10 @@ public class ColumnReaderImpl implements ColumnReader {
 	 * @param forDefinitionFileName - name of the file with definition level data
 	 * @param maxDefinitionLevel - maximum definition level (from the Dremel paper) of the column. It is needed to infer null values;
 	 */
-	public ColumnReaderImpl (ColumnType forColumnType, ColumnFileSet fileSet, byte maxDefinitionLevel)
+	public ColumnReaderImpl (ColumnMetaData forColumnMetaData)
 	{
-		columnType = forColumnType;
-		columnFileSet = fileSet;
-		maximumDefinitionLevel = maxDefinitionLevel;
+		columnMetaData = forColumnMetaData;
+		
 		openFiles();
 	}
 
@@ -65,11 +77,13 @@ public class ColumnReaderImpl implements ColumnReader {
 	 */
 	private void openFiles() {
 				
-		int dataFileMagic = getColumnMagicBytes(columnType);
+		int dataFileMagic = getColumnMagicBytes(columnMetaData.getColumnType());
 		
-		dataInput 		 = openColumnFile(columnFileSet.getDataFileName(), dataFileMagic);
-		definitionInput  = openColumnFile(columnFileSet.getDefFileName(), DataSetConstants.DEFINITION_COLUMN_MAGIC);
-		repetitionInput  = openColumnFile(columnFileSet.getRepFileName(), DataSetConstants.REPETITION_COLUMN_MAGIC);
+		ColumnFileSet columnFileSet = columnMetaData.getFileSet();
+		
+		dataInput 		 = openColumnFile(columnFileSet.getDataFileName(), dataFileMagic, columnMetaData);
+		definitionInput  = openColumnFile(columnFileSet.getDefFileName(), DataSetConstants.DEFINITION_COLUMN_MAGIC, columnMetaData);
+		repetitionInput  = openColumnFile(columnFileSet.getRepFileName(), DataSetConstants.REPETITION_COLUMN_MAGIC, columnMetaData);
 
 	}
 	/**
@@ -79,14 +93,21 @@ public class ColumnReaderImpl implements ColumnReader {
 	 * @return
 	 */
 	private static DataInputStream openColumnFile(String fileName,
-			int expectedFileMagic) {
-		try {
+			int expectedFileMagic, ColumnMetaData columnMetaData) {
+		try {			
 			DataInputStream resultStream = new DataInputStream(new FileInputStream(fileName));
 			
 			int presentMagicNumber = resultStream.readInt();
 			if(presentMagicNumber != expectedFileMagic)
 			{
 				throw new RuntimeException("Incorrect type (by the magic byte analysing) in the file "+fileName+" expected file type is " + getTypeNameByMagic(expectedFileMagic)+ " while the actual is "+getTypeNameByMagic(presentMagicNumber));
+			}
+			
+			//TODO chain the appropriate decoder
+			if(columnMetaData.getEncoding() != ColumnMetaData.EncodingType.NONE)
+			{
+				StreamDecoder decoder = EncodingFactory.getDecoder(columnMetaData, resultStream);
+				resultStream = new DataInputStream(decoder);
 			}
 			
 			return resultStream;
@@ -118,7 +139,7 @@ public class ColumnReaderImpl implements ColumnReader {
 
 	@Override
 	public ColumnType getDataType() {
-		return columnType;
+		return columnMetaData.getColumnType();
 	}
 
 	@Override
@@ -169,13 +190,13 @@ public class ColumnReaderImpl implements ColumnReader {
 			return false;	
 		}
 		catch (IOException e) {
-			throw new RuntimeException("Reading defenition level from the file "+columnFileSet.getDefFileName() + "failed", e);
+			throw new RuntimeException("Reading defenition level from the file "+columnMetaData.getFileSet().getDefFileName() + "failed", e);
 	}	
 		
 		// read repetition level
 		readRepetitionLevel();
 		
-		if(nextDefLevel == maximumDefinitionLevel)
+		if(nextDefLevel == columnMetaData.getMaxDefinitionLevel())
 		{
 			currentIsNull=false;
 			// read typed value;
@@ -195,14 +216,14 @@ public class ColumnReaderImpl implements ColumnReader {
 	private void readNextDataValue() {
 		
 		try {
-		if(columnType == ColumnType.INT)
+		if(columnMetaData.getColumnType() == ColumnType.INT)
 		{
 			currentIntValue = dataInput.readInt();			
 			return;
 		}
 		
 		
-		if(columnType == ColumnType.BYTE)
+		if(columnMetaData.getColumnType() == ColumnType.BYTE)
 		{
 			currentByteValue = dataInput.readByte();
 			return;
@@ -232,7 +253,7 @@ public class ColumnReaderImpl implements ColumnReader {
 				readNextRepetitionLevel();
 				
 			} catch (IOException e) {
-				throw new RuntimeException("Read repetition level from the file "+columnFileSet.getRepFileName() + " failed "+e);
+				throw new RuntimeException("Read repetition level from the file "+columnMetaData.getFileSet().getRepFileName() + " failed "+e);
 			}	
 		}
 	}
@@ -249,36 +270,13 @@ public class ColumnReaderImpl implements ColumnReader {
 			}
 		}
 		catch (IOException e) {
-			throw new RuntimeException("Read repetition level from the file "+columnFileSet.getRepFileName() + " failed "+e);
+			throw new RuntimeException("Read repetition level from the file "+columnMetaData.getFileSet().getRepFileName() + " failed "+e);
 		}
 	}
 
-	public static class ColumnFileSet
-	{
-		private String dataFileName;
-		private String defFileName;
-		private String repFileName;
-		
-		public ColumnFileSet(String baseFileName)
-		{
-			dataFileName = baseFileName+"_data.dremel";
-			repFileName = baseFileName+"_ref.dremel";
-			defFileName = baseFileName+"_def.dremel";
-		}
-		
-		public String getDataFileName()
-		{
-			return dataFileName;
-		}
-		public String getDefFileName()
-		{
-			return defFileName;
-		}
-		public String getRepFileName()
-		{
-			return repFileName;
-		}
-				
+	@Override
+	public String getStringValue() {
+		throw new RuntimeException("Not implemented");
 	}
 
 }

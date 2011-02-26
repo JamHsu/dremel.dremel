@@ -2,91 +2,23 @@ package dremel.dataset;
 
 import static org.junit.Assert.*;
 
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-
 import org.junit.Test;
 
-import dremel.dataset.ColumnReader.ColumnType;
+import dremel.dataset.ColumnMetaData.ColumnType;
+import dremel.dataset.ColumnMetaData.EncodingType;
+import dremel.dataset.impl.ColumnWriterImpl;
+import dremel.dataset.impl.ColumnFileSet;
 import dremel.dataset.impl.ColumnReaderImpl;
-import dremel.dataset.impl.DataSetConstants;
+
 
 public class ColumnReaderTest {
-	
-	
-	private static class ColumnBuilder
-	{
-		DataOutputStream dataOutput;
-		DataOutputStream repOutput;
-		DataOutputStream defOutput;
 		
-		public ColumnBuilder(ColumnReaderImpl.ColumnFileSet fileSet, ColumnReader.ColumnType columnType)
-		{
-			try {
-							
-			dataOutput = new DataOutputStream(new FileOutputStream(new File(fileSet.getDataFileName())));
-			repOutput = new DataOutputStream(new FileOutputStream(new File(fileSet.getRepFileName())));
-			defOutput = new DataOutputStream(new FileOutputStream(new File(fileSet.getDefFileName())));
-			
-			int dataMagicBytes = getMagicByColumnType(columnType);
-			
-			dataOutput.writeInt(dataMagicBytes);
-			repOutput.writeInt(DataSetConstants.REPETITION_COLUMN_MAGIC);
-			defOutput.writeInt(DataSetConstants.DEFINITION_COLUMN_MAGIC);
-				
-			} catch (IOException e) {
-				throw new RuntimeException("Open output file failed ", e);
-			}
-			
-		}
+	public void testIntColumnGeneric(int[] data, boolean[] isNull, byte[] defLevel, byte[] repLevel, byte byteMaxRepLevel, byte maxDefLevel)
+	{				
 		
-		private int getMagicByColumnType(ColumnType columnType) {
-			
-			switch(columnType)
-			{
-				case BYTE : return DataSetConstants.BYTE_COLUMN_MAGIC;
-				case INT : return DataSetConstants.INT_COLUMN_MAGIC;
-				default : throw new RuntimeException("unexpected column type "+ columnType); 
-			}			
-		}
-
+		ColumnMetaData columnMetaData= new ColumnMetaData("Links.LinksForward", ColumnType.INT, EncodingType.NONE, "testdata\\LinksForward", byteMaxRepLevel, maxDefLevel);
 		
-		public void addIntDataTriple(int data, boolean isNull, byte repLevel, byte defLevel)
-		{
-			try {
-
-				if(!isNull)
-				{ // NULL values are not written to the storage. They are deduced from the definition level during the read
-					dataOutput.writeInt(data);
-				}			
-				repOutput.writeByte(repLevel);
-				defOutput.writeByte(defLevel);
-			
-				} catch (IOException e) {
-					throw new RuntimeException("Writing data to the column failed", e);
-			}
-		}
-		
-	
-		private void close() {		
-			try {
-				dataOutput.close();		
-				repOutput.close();
-				defOutput.close();		
-			} catch (IOException e) {
-				throw new RuntimeException("Closing data streams failed ",e);
-			}
-}
-	
-	}
-	
-	public void testIntColumnGeneric(int[] data, boolean[] isNull, byte[] defLevel, byte[] repLevel, byte maxDefLevel)
-	{		
-		ColumnReaderImpl.ColumnFileSet fileSet = new ColumnReaderImpl.ColumnFileSet("testdata\\LinksForward");
-		ColumnBuilder columnBuilder = new ColumnBuilder(fileSet, ColumnType.INT);
+		ColumnWriterImpl columnBuilder = new ColumnWriterImpl(columnMetaData);
 		// write data
 		for(int i=0; i<data.length; i++)
 		{
@@ -95,9 +27,9 @@ public class ColumnReaderTest {
 		
 		columnBuilder.close();
 		// verify data
+				
 		
-		ColumnReader columnReader = new ColumnReaderImpl(ColumnType.INT, fileSet, maxDefLevel);
-		
+		ColumnReader columnReader = new ColumnReaderImpl(columnMetaData);		
 		
 		for(int i=0; i<data.length; i++)
 		{			
@@ -113,7 +45,6 @@ public class ColumnReaderTest {
 			}
 		}
 		assertFalse(columnReader.next());		
-		
 		
 	}
 	
@@ -147,7 +78,7 @@ public class ColumnReaderTest {
 		isNull[1] = false;
 		isNull[2] = false;
 		
-		testIntColumnGeneric(data, isNull, defLevel, repLevel, /*max def level */(byte)2);
+		testIntColumnGeneric(data, isNull, defLevel, repLevel,/*max ref level*/ (byte)2 ,/*max def level */(byte)2);
 		}
 		
 		{
@@ -164,7 +95,7 @@ public class ColumnReaderTest {
 			boolean[] isNull = new boolean[1];
 			isNull[0] = true;
 			
-			testIntColumnGeneric(data, isNull, defLevel, repLevel, /*max def level */(byte)2);
+			testIntColumnGeneric(data, isNull, defLevel, repLevel, /*max ref level*/ (byte)2,/*max def level */(byte)2);
 			}
 	}
 
