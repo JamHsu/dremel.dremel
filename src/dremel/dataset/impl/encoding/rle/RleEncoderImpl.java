@@ -14,12 +14,14 @@
    See the License for the specific language governing permissions and
    limitations under the License.Ope
 */
-
 package dremel.dataset.impl.encoding.rle;
 
 import java.io.IOException;
 import java.io.OutputStream;
+
 import dremel.dataset.impl.encoding.StreamEncoder;
+
+
 
 /**
  * Implements RLE encoding scheme. This class overrides InputStream's functionality
@@ -34,6 +36,7 @@ public class RleEncoderImpl extends StreamEncoder {
 	int startIndex = 1;
 	boolean firstTime = true;
 	byte repeatedBytes = 0;
+	boolean flushed = false;
 	
 	public static RleEncoderImpl instance(OutputStream out) {
 		return new RleEncoderImpl(out);
@@ -59,6 +62,7 @@ public class RleEncoderImpl extends StreamEncoder {
 		else {
 			head++;
 		}
+		flushed = false;
 	}
 	
 	/**
@@ -66,8 +70,12 @@ public class RleEncoderImpl extends StreamEncoder {
 	 */
 	public void flush() {
 		super.flush();
-		encode();
-		writeEncodedTuple();
+		if(!flushed)
+		{
+			encode();
+			writeEncodedTuple();
+		}
+		flushed = true;
 	}
 
 	/**
@@ -111,7 +119,8 @@ public class RleEncoderImpl extends StreamEncoder {
 			// writes 'head' itself
 			encodedOut.write(lastNeedle);					
 		} catch (IOException e) {
-			throw new RuntimeException("writeEncodedTuple failed");
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 	}
 }

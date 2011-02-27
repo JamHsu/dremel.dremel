@@ -41,22 +41,27 @@ import dremel.dataset.impl.encoding.rle.*;
 public class RleTest {
 	
 	static int maxOSArraySize = 256;
-	/*
+	
 	@Test
 	public void streamTest()
 	{
-		byte[] b1 = new byte[11];
+		
+		byte[] b1 = new byte[3];
 		b1[0] = 0;
-		b1[1] = 1;
-		b1[2] = 1;
-		b1[3] = 3;
+		b1[1] = 2;
+		b1[2] = 2;
+		/*b1[3] = 3;
 		b1[4] = 3;
 		b1[5] = 5;
 		b1[6] = 5;
 		b1[7] = 7;
 		b1[8] = 7;
 		b1[9] = 7;
-		b1[10] = 9;
+		b1[10] = 9; */
+		
+		/*
+		byte[] b1 = new byte[1];
+		b1[0] = 0; */
 		
 		File  f = new File("testdata\\rleTest");
 		
@@ -67,12 +72,30 @@ public class RleTest {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		
+		 
+		
 		RleEncoderImpl rleEncoder= RleEncoderImpl.instance(dataOutput);
+		
+		DataOutputStream dataOut = new DataOutputStream(rleEncoder);
+		
 		for(int i=0; i<b1.length; i++)
 		{
-			rleEncoder.write(b1[i]);
+			//rleEncoder.write(b1[i]);
+			try {
+				dataOut.write(b1[i]);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
-		rleEncoder.close();
+		try {
+			dataOut.close();
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		//rleEncoder.close();
 		
 		DataInputStream dataInput = null;
 		try {
@@ -81,15 +104,20 @@ public class RleTest {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		
 		RleDecoderImpl rleDecoder = RleDecoderImpl.instance(dataInput);
+		
+		DataInputStream decodedDataInput = new DataInputStream(rleDecoder);
 		
 		int index = 0;
 		while(true)
 		{
 			try
 			{
-				int nextValue = rleDecoder.read();			
-			//	assertTrue(nextValue == b1[index]);
+				//int nextValue = rleDecoder.read();
+				int nextValue = decodedDataInput.readByte();
+				assertTrue(nextValue == b1[index]);
+				index++;
 			}catch(Exception ex)
 			{
 				break;
@@ -97,7 +125,7 @@ public class RleTest {
 		}
 		
 	}
-	*/
+	
 	
 	@Test
 	public void encoderDecoderTest1() throws IOException {

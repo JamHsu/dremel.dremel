@@ -13,10 +13,10 @@ import dremel.dataset.impl.ColumnReaderImpl;
 
 public class ColumnReaderTest {
 		
-	public void testIntColumnGeneric(int[] data, boolean[] isNull, byte[] defLevel, byte[] repLevel, byte byteMaxRepLevel, byte maxDefLevel)
+	public void testIntColumnGeneric(int[] data, boolean[] isNull, byte[] defLevel, byte[] repLevel, byte byteMaxRepLevel, byte maxDefLevel, EncodingType encodingTypeToUse)
 	{				
 		
-		ColumnMetaData columnMetaData= new ColumnMetaData("Links.LinksForward", ColumnType.INT, EncodingType.NONE, "testdata\\LinksForward", byteMaxRepLevel, maxDefLevel);
+		ColumnMetaData columnMetaData= new ColumnMetaData("Links.LinksForward", ColumnType.INT, encodingTypeToUse, "testdata\\LinksForward", byteMaxRepLevel, maxDefLevel);
 		
 		ColumnWriterImpl columnBuilder = new ColumnWriterImpl(columnMetaData);
 		// write data
@@ -78,7 +78,8 @@ public class ColumnReaderTest {
 		isNull[1] = false;
 		isNull[2] = false;
 		
-		testIntColumnGeneric(data, isNull, defLevel, repLevel,/*max ref level*/ (byte)2 ,/*max def level */(byte)2);
+		testIntColumnGeneric(data, isNull, defLevel, repLevel,/*max ref level*/ (byte)2 ,/*max def level */(byte)2, EncodingType.NONE);
+		testIntColumnGeneric(data, isNull, defLevel, repLevel,/*max ref level*/ (byte)2 ,/*max def level */(byte)2, EncodingType.RLE);
 		}
 		
 		{
@@ -95,7 +96,8 @@ public class ColumnReaderTest {
 			boolean[] isNull = new boolean[1];
 			isNull[0] = true;
 			
-			testIntColumnGeneric(data, isNull, defLevel, repLevel, /*max ref level*/ (byte)2,/*max def level */(byte)2);
+			testIntColumnGeneric(data, isNull, defLevel, repLevel, /*max ref level*/ (byte)2,/*max def level */(byte)2, EncodingType.NONE);
+			testIntColumnGeneric(data, isNull, defLevel, repLevel, /*max ref level*/ (byte)2,/*max def level */(byte)2, EncodingType.RLE);
 			}
 	}
 

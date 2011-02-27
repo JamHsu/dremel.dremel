@@ -14,7 +14,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.Ope
 */
-
 package dremel.dataset.impl.encoding;
 
 import java.io.OutputStream;

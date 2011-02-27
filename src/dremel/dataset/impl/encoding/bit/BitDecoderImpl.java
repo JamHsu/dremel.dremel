@@ -14,9 +14,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.Ope
 */
-
 package dremel.dataset.impl.encoding.bit;
 
+import static org.junit.Assert.assertFalse;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -83,7 +83,8 @@ public class BitDecoderImpl extends StreamDecoder {
 	 * Reads the next needle from the raw input stream.
 	 * Implemented method 
 	 */
-	public int read() {
+	public int read() throws IOException {
+		checkStreamsDataAvailability();
 		if (firstTime) {
 			firstTime = false;
 			// read bits width

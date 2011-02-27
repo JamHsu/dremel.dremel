@@ -14,11 +14,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.Ope
 */
-
 package dremel.dataset.impl.encoding.rle;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 
 import dremel.dataset.impl.encoding.StreamDecoder;
 
@@ -84,7 +84,8 @@ public class RleDecoderImpl extends StreamDecoder {
 	 * Reads the next needle from the raw input stream.
 	 * Implemented method 
 	 */
-	public int read() {
+	public int read() throws IOException {
+		checkStreamsDataAvailability();
 		try {
 			if (readBytes == 0) {
 				nextRepeater = 0;

@@ -17,7 +17,7 @@ import dremel.dataset.impl.TabletImpl;
 public class TabletTest {
 	
 	
-	public void buildColumnData(ColumnMetaData columnMetaData)
+	public void buildLinkBackwardData(ColumnMetaData columnMetaData)
 	{
 		ColumnWriterImpl columnBuilder = new ColumnWriterImpl(columnMetaData);
 		// write data
@@ -29,21 +29,55 @@ public class TabletTest {
 	
 	}
 	
+	public void buildLinksForwardData(ColumnMetaData columnMetaData)
+	{
+		ColumnWriterImpl columnBuilder = new ColumnWriterImpl(columnMetaData);
+		// write data
+		columnBuilder.addIntDataTriple(20, ColumnReader.NOT_NULL, (byte)0, (byte)2);
+		columnBuilder.addIntDataTriple(40, ColumnReader.NOT_NULL, (byte)1, (byte)2);
+		columnBuilder.addIntDataTriple(60, ColumnReader.NOT_NULL, (byte)1, (byte)2);
+		columnBuilder.addIntDataTriple(80, ColumnReader.NOT_NULL, (byte)0, (byte)2);
+		
+		columnBuilder.close();
+	
+	}
+		
+	@Test
+	public void twoColumnsTabletRoundtripTest()
+	{
+		// build single column tablet for the input
+		ColumnMetaData linksBackwardMetaData= new ColumnMetaData("Links.LinksBackward", ColumnType.INT, EncodingType.NONE, "testdata\\LinksForward", (byte)1, (byte)2);
+		buildLinkBackwardData(linksBackwardMetaData);
+		
+		ColumnMetaData linksForwardMetaData= new ColumnMetaData("Links.LinksForward", ColumnType.INT, EncodingType.NONE, "testdata\\LinksForward", (byte)1, (byte)2);
+		buildLinkBackwardData(linksForwardMetaData);
+				
+		SchemaImpl schema = new SchemaImpl();
+		schema.addColumnMetaData(linksBackwardMetaData);
+		schema.addColumnMetaData(linksForwardMetaData);
+		
+		Tablet tablet = new TabletImpl(schema);
+						
+		checkNullCopy(schema, tablet);
+	}
+	
 	@Test
 	public void singleColumnTabletRoundtripTest()
 	{
 		// build single column tablet for the input
-		ColumnMetaData columnMetaData= new ColumnMetaData("Links.LinksForward", ColumnType.INT, EncodingType.NONE, "testdata\\LinksForward", (byte)1, (byte)2);
-		buildColumnData(columnMetaData);
+		ColumnMetaData columnMetaData= new ColumnMetaData("Links.LinksForward", ColumnType.INT, EncodingType.RLE, "testdata\\LinksForward", (byte)1, (byte)2);
+		buildLinkBackwardData(columnMetaData);
 		
-		Map<String, ColumnMetaData> columns = new HashMap<String, ColumnMetaData>();
-		columns.put(columnMetaData.getColumnName(), columnMetaData );
 		
 		SchemaImpl schema = new SchemaImpl();
 		schema.addColumnMetaData(columnMetaData);
 		
 		Tablet tablet = new TabletImpl(schema);
 						
+		checkNullCopy(schema, tablet);
+	}
+
+	private void checkNullCopy(SchemaImpl schema, Tablet tablet) {
 		TabletIterator tabletIterator = tablet.getIterator();		
 		
 		// create output tablet

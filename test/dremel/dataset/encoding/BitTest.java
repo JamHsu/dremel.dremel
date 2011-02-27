@@ -17,7 +17,6 @@
 package dremel.dataset.encoding;
 
 import static org.junit.Assert.*;
-import static org.junit.Assert.assertArrayEquals;
 import java.io.IOException;
 import org.junit.Test;
 
